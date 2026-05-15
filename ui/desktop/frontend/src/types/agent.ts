@@ -105,7 +105,6 @@ export interface AgentData {
   sandbox_config?: SandboxConfig | null
   subagents_config?: SubagentsConfig | null
   other_config?: Record<string, unknown> | null
-  tenant_id?: string
 }
 
 export interface AgentInput {

@@ -173,6 +173,30 @@ Permission enforcement for Model Context Protocol servers with scope validation 
 
 ---
 
+## Desktop App v4 Redesign (VERIFIED)
+
+**Status:** Phase 00-08 complete | **Updated:** 2026-05-15
+
+### Scope
+
+Desktop Lite v4 runtime isolation and UI redesign for Wails + SQLite.
+
+### Completed
+
+- Runtime isolation: desktop default port `18791`, data dir `~/.goclaw/v4`, DB `goclaw-v4.db`, release tags `lite-v4-*`.
+- First-run local admin bootstrap/auth with OS keyring token storage.
+- Settings IA shell with grouped sidebar; Channels hidden from visible desktop Settings.
+- Agent config redesign, Config Admin, Credentials, Backup/Restore.
+- Projects CRUD, Approvals/Pending inboxes, and MCP scope-aware form.
+- Final stale-copy sweep for desktop visible UI/docs: removed stale tenant, quota, and channel wording; STT proxy `tenant_id` remains as provider-contract field.
+- Verification: frontend tests/build, Go PG build, Go sqliteonly build, and Wails sqliteonly package build.
+
+### Remaining
+
+- Desktop release-candidate review before tagging `lite-v4-*`.
+
+---
+
 ## Deferred to RC2
 
 - ~~**Channel path matrix production wire-in**~~ **LANDED 2026-05-07** (commit `780eab16`).

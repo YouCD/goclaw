@@ -10,7 +10,6 @@ func (c *Config) MaskedCopy() *Config {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	// Deep copy via JSON round-trip
 	data, err := json.Marshal(c)
 	if err != nil {
 		return &Config{}
@@ -20,184 +19,105 @@ func (c *Config) MaskedCopy() *Config {
 		return &Config{}
 	}
 
-	// Mask provider API keys
-	maskNonEmpty(&cp.Providers.Anthropic.APIKey)
-	maskNonEmpty(&cp.Providers.OpenAI.APIKey)
-	maskNonEmpty(&cp.Providers.OpenRouter.APIKey)
-	maskNonEmpty(&cp.Providers.Groq.APIKey)
-	maskNonEmpty(&cp.Providers.DeepSeek.APIKey)
-	maskNonEmpty(&cp.Providers.Gemini.APIKey)
-	maskNonEmpty(&cp.Providers.Mistral.APIKey)
-	maskNonEmpty(&cp.Providers.XAI.APIKey)
-	maskNonEmpty(&cp.Providers.MiniMax.APIKey)
-	maskNonEmpty(&cp.Providers.Cohere.APIKey)
-	maskNonEmpty(&cp.Providers.Perplexity.APIKey)
-	maskNonEmpty(&cp.Providers.DashScope.APIKey)
-	maskNonEmpty(&cp.Providers.Bailian.APIKey)
-	maskNonEmpty(&cp.Providers.Zai.APIKey)
-	maskNonEmpty(&cp.Providers.ZaiCoding.APIKey)
-	maskNonEmpty(&cp.Providers.OllamaCloud.APIKey)
-
-	// Mask gateway token
-	maskNonEmpty(&cp.Gateway.Token)
-
-	// Mask channel secrets
-	maskNonEmpty(&cp.Channels.Telegram.Token)
-	maskNonEmpty(&cp.Channels.Discord.Token)
-	maskNonEmpty(&cp.Channels.Slack.BotToken)
-	maskNonEmpty(&cp.Channels.Slack.AppToken)
-	maskNonEmpty(&cp.Channels.Zalo.Token)
-	maskNonEmpty(&cp.Channels.Zalo.WebhookSecret)
-	maskNonEmpty(&cp.Channels.Feishu.AppID)
-	maskNonEmpty(&cp.Channels.Feishu.AppSecret)
-	maskNonEmpty(&cp.Channels.Feishu.EncryptKey)
-	maskNonEmpty(&cp.Channels.Feishu.VerificationToken)
-
-	// Mask TTS API keys
-	maskNonEmpty(&cp.Tts.OpenAI.APIKey)
-	maskNonEmpty(&cp.Tts.ElevenLabs.APIKey)
-	maskNonEmpty(&cp.Tts.MiniMax.APIKey)
-
-	// Mask Tailscale auth key
-	maskNonEmpty(&cp.Tailscale.AuthKey)
-
+	forEachConfigSecret(cp, func(_ string, dst *string) {
+		maskNonEmpty(dst)
+	})
 	return cp
 }
 
 // StripSecrets zeros out all secret fields in the config.
 // Used before saving to disk to ensure secrets never persist in config.json.
 func (c *Config) StripSecrets() {
-	// Provider API keys
-	c.Providers.Anthropic.APIKey = ""
-	c.Providers.OpenAI.APIKey = ""
-	c.Providers.OpenRouter.APIKey = ""
-	c.Providers.Groq.APIKey = ""
-	c.Providers.DeepSeek.APIKey = ""
-	c.Providers.Gemini.APIKey = ""
-	c.Providers.Mistral.APIKey = ""
-	c.Providers.XAI.APIKey = ""
-	c.Providers.MiniMax.APIKey = ""
-	c.Providers.Cohere.APIKey = ""
-	c.Providers.Perplexity.APIKey = ""
-	c.Providers.DashScope.APIKey = ""
-	c.Providers.Bailian.APIKey = ""
-	c.Providers.Zai.APIKey = ""
-	c.Providers.ZaiCoding.APIKey = ""
-	c.Providers.OllamaCloud.APIKey = ""
-
-	// Gateway token
-	c.Gateway.Token = ""
-
-	// Channel secrets
-	c.Channels.Telegram.Token = ""
-	c.Channels.Discord.Token = ""
-	c.Channels.Slack.BotToken = ""
-	c.Channels.Slack.AppToken = ""
-	c.Channels.Zalo.Token = ""
-	c.Channels.Zalo.WebhookSecret = ""
-	c.Channels.Feishu.AppID = ""
-	c.Channels.Feishu.AppSecret = ""
-	c.Channels.Feishu.EncryptKey = ""
-	c.Channels.Feishu.VerificationToken = ""
-
-	// TTS API keys
-	c.Tts.OpenAI.APIKey = ""
-	c.Tts.ElevenLabs.APIKey = ""
-	c.Tts.MiniMax.APIKey = ""
-
-	// Tailscale auth key
-	c.Tailscale.AuthKey = ""
+	forEachConfigSecret(c, func(_ string, dst *string) {
+		*dst = ""
+	})
 }
 
 // StripMaskedSecrets strips only fields that still contain the mask value "***".
-// Real values (user-entered via UI) are preserved, so that secrets entered
-// via the config UI persist in config.json.
+// Real values are preserved so UI-entered secrets can be extracted before save.
 func (c *Config) StripMaskedSecrets() {
-	stripIfMasked := func(s *string) {
-		if *s == secretMask {
-			*s = ""
+	forEachConfigSecret(c, func(_ string, dst *string) {
+		if *dst == secretMask {
+			*dst = ""
 		}
-	}
-
-	// Provider API keys
-	stripIfMasked(&c.Providers.Anthropic.APIKey)
-	stripIfMasked(&c.Providers.OpenAI.APIKey)
-	stripIfMasked(&c.Providers.OpenRouter.APIKey)
-	stripIfMasked(&c.Providers.Groq.APIKey)
-	stripIfMasked(&c.Providers.DeepSeek.APIKey)
-	stripIfMasked(&c.Providers.Gemini.APIKey)
-	stripIfMasked(&c.Providers.Mistral.APIKey)
-	stripIfMasked(&c.Providers.XAI.APIKey)
-	stripIfMasked(&c.Providers.MiniMax.APIKey)
-	stripIfMasked(&c.Providers.Cohere.APIKey)
-	stripIfMasked(&c.Providers.Perplexity.APIKey)
-	stripIfMasked(&c.Providers.DashScope.APIKey)
-	stripIfMasked(&c.Providers.Bailian.APIKey)
-	stripIfMasked(&c.Providers.Zai.APIKey)
-	stripIfMasked(&c.Providers.ZaiCoding.APIKey)
-	stripIfMasked(&c.Providers.OllamaCloud.APIKey)
-
-	// Gateway token
-	stripIfMasked(&c.Gateway.Token)
-
-	// Channel secrets
-	stripIfMasked(&c.Channels.Telegram.Token)
-	stripIfMasked(&c.Channels.Discord.Token)
-	stripIfMasked(&c.Channels.Slack.BotToken)
-	stripIfMasked(&c.Channels.Slack.AppToken)
-	stripIfMasked(&c.Channels.Zalo.Token)
-	stripIfMasked(&c.Channels.Zalo.WebhookSecret)
-	stripIfMasked(&c.Channels.Feishu.AppID)
-	stripIfMasked(&c.Channels.Feishu.AppSecret)
-	stripIfMasked(&c.Channels.Feishu.EncryptKey)
-	stripIfMasked(&c.Channels.Feishu.VerificationToken)
-
-	// TTS API keys
-	stripIfMasked(&c.Tts.OpenAI.APIKey)
-	stripIfMasked(&c.Tts.ElevenLabs.APIKey)
-	stripIfMasked(&c.Tts.MiniMax.APIKey)
-
-	// Tailscale auth key
-	stripIfMasked(&c.Tailscale.AuthKey)
+	})
 }
 
-// ApplyDBSecrets overlays secrets from the config_secrets table onto the config.
-// Called before ApplyEnvOverrides() — env vars take highest precedence.
-// Precedence chain: config.json defaults → DB secrets → env vars.
+// ApplyDBSecrets overlays encrypted secrets from config_secrets onto config.
+// Called before ApplyEnvOverrides() so env vars keep highest precedence.
 func (c *Config) ApplyDBSecrets(secrets map[string]string) {
-	apply := func(key string, dst *string) {
+	forEachConfigSecret(c, func(key string, dst *string) {
 		if v, ok := secrets[key]; ok && v != "" {
 			*dst = v
 		}
-	}
-
-	apply("gateway.token", &c.Gateway.Token)
-	apply("tts.openai.api_key", &c.Tts.OpenAI.APIKey)
-	apply("tts.elevenlabs.api_key", &c.Tts.ElevenLabs.APIKey)
-	apply("tts.minimax.api_key", &c.Tts.MiniMax.APIKey)
-	apply("tts.minimax.group_id", &c.Tts.MiniMax.GroupID)
-	apply("tailscale.auth_key", &c.Tailscale.AuthKey)
+	})
 }
 
-// ExtractDBSecrets returns the config_secrets key-value pairs from the config.
-// Saves secrets to the config_secrets table.
+// ExtractDBSecrets returns non-empty secret values for config_secrets storage.
 func (c *Config) ExtractDBSecrets() map[string]string {
 	secrets := make(map[string]string)
+	forEachConfigSecret(c, func(key string, src *string) {
+		if *src != "" && *src != secretMask {
+			secrets[key] = *src
+		}
+	})
+	return secrets
+}
 
-	collect := func(key, value string) {
-		if value != "" && value != secretMask {
-			secrets[key] = value
+func forEachConfigSecret(c *Config, visit func(key string, field *string)) {
+	visit("providers.anthropic.api_key", &c.Providers.Anthropic.APIKey)
+	visit("providers.openai.api_key", &c.Providers.OpenAI.APIKey)
+	visit("providers.openrouter.api_key", &c.Providers.OpenRouter.APIKey)
+	visit("providers.groq.api_key", &c.Providers.Groq.APIKey)
+	visit("providers.gemini.api_key", &c.Providers.Gemini.APIKey)
+	visit("providers.deepseek.api_key", &c.Providers.DeepSeek.APIKey)
+	visit("providers.mistral.api_key", &c.Providers.Mistral.APIKey)
+	visit("providers.xai.api_key", &c.Providers.XAI.APIKey)
+	visit("providers.minimax.api_key", &c.Providers.MiniMax.APIKey)
+	visit("providers.cohere.api_key", &c.Providers.Cohere.APIKey)
+	visit("providers.perplexity.api_key", &c.Providers.Perplexity.APIKey)
+	visit("providers.dashscope.api_key", &c.Providers.DashScope.APIKey)
+	visit("providers.bailian.api_key", &c.Providers.Bailian.APIKey)
+	visit("providers.zai.api_key", &c.Providers.Zai.APIKey)
+	visit("providers.zai_coding.api_key", &c.Providers.ZaiCoding.APIKey)
+	visit("providers.ollama_cloud.api_key", &c.Providers.OllamaCloud.APIKey)
+	visit("providers.novita.api_key", &c.Providers.Novita.APIKey)
+	visit("providers.byteplus.api_key", &c.Providers.BytePlus.APIKey)
+	visit("providers.byteplus_coding.api_key", &c.Providers.BytePlusCoding.APIKey)
+
+	visit("gateway.token", &c.Gateway.Token)
+
+	visit("channels.telegram.token", &c.Channels.Telegram.Token)
+	visit("channels.telegram.stt_api_key", &c.Channels.Telegram.STTAPIKey)
+	visit("channels.discord.token", &c.Channels.Discord.Token)
+	visit("channels.discord.stt_api_key", &c.Channels.Discord.STTAPIKey)
+	visit("channels.slack.bot_token", &c.Channels.Slack.BotToken)
+	visit("channels.slack.app_token", &c.Channels.Slack.AppToken)
+	visit("channels.slack.user_token", &c.Channels.Slack.UserToken)
+	visit("channels.zalo.token", &c.Channels.Zalo.Token)
+	visit("channels.zalo.webhook_secret", &c.Channels.Zalo.WebhookSecret)
+	visit("channels.feishu.app_id", &c.Channels.Feishu.AppID)
+	visit("channels.feishu.app_secret", &c.Channels.Feishu.AppSecret)
+	visit("channels.feishu.encrypt_key", &c.Channels.Feishu.EncryptKey)
+	visit("channels.feishu.verification_token", &c.Channels.Feishu.VerificationToken)
+	visit("channels.feishu.stt_api_key", &c.Channels.Feishu.STTAPIKey)
+
+	visit("tts.openai.api_key", &c.Tts.OpenAI.APIKey)
+	visit("tts.elevenlabs.api_key", &c.Tts.ElevenLabs.APIKey)
+	visit("tts.minimax.api_key", &c.Tts.MiniMax.APIKey)
+	visit("tts.minimax.group_id", &c.Tts.MiniMax.GroupID)
+	visit("tts.gemini.api_key", &c.Tts.Gemini.APIKey)
+
+	if c.Audio != nil {
+		if c.Audio.Stt != nil {
+			visit("audio.stt.api_key", &c.Audio.Stt.APIKey)
+		}
+		if c.Audio.Music != nil {
+			visit("audio.music.api_key", &c.Audio.Music.APIKey)
 		}
 	}
 
-	collect("gateway.token", c.Gateway.Token)
-	collect("tts.openai.api_key", c.Tts.OpenAI.APIKey)
-	collect("tts.elevenlabs.api_key", c.Tts.ElevenLabs.APIKey)
-	collect("tts.minimax.api_key", c.Tts.MiniMax.APIKey)
-	collect("tts.minimax.group_id", c.Tts.MiniMax.GroupID)
-	collect("tailscale.auth_key", c.Tailscale.AuthKey)
-
-	return secrets
+	visit("tailscale.auth_key", &c.Tailscale.AuthKey)
 }
 
 func maskNonEmpty(s *string) {

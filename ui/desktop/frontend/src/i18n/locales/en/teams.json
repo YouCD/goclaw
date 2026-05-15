@@ -77,10 +77,13 @@
   "feature": "Feature",
   "edition": {
     "group": {
-      "limits": "Limits",
+      "runtime": "Runtime",
       "core": "Core Features",
       "standardOnly": "Advanced (Standard)"
     },
+    "database": "Database",
+    "deployment": "Deployment",
+    "users": "Users",
     "agents": "Agents",
     "teams": "Teams",
     "teamMembers": "Team Members",
@@ -100,12 +103,12 @@
     "knowledgeGraph": "Knowledge Graph",
     "vectorSearch": "Vector Search",
     "rbac": "Role-Based Access",
-    "multiTenant": "Multi-Tenant",
+    "workspaceIsolation": "Workspace Isolation",
     "agentLinks": "Agent Links",
     "activityLogs": "Activity Logs",
     "apiKeys": "API Keys",
     "poolProvider": "Pool Provider",
     "secureCli": "Secure CLI",
-    "tenantUsers": "Tenant & User Management"
+    "userManagement": "User Management"
   }
 }

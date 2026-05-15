@@ -1,27 +1,40 @@
+import { useTranslation } from 'react-i18next'
 import { useUiStore } from '../../stores/ui-store'
-import { SettingsTabBar } from './SettingsTabBar'
+import type { SettingsTab } from '../../stores/ui-store'
+import { SettingsSidebarNav } from './SettingsSidebarNav'
 import { AppearanceTab } from './AppearanceTab'
 import { AboutTab } from './AboutTab'
+import { findSettingsSection } from './settings-sections'
+import { GeneralSettingsTab } from './GeneralSettingsTab'
+import { CredentialsTab } from './CredentialsTab'
+import { BackupRestoreTab } from './BackupRestoreTab'
 import { ProviderList } from '../providers/ProviderList'
 import { AgentList } from '../agents/AgentList'
 import { McpServerList } from '../mcp/McpServerList'
 import { SkillList } from '../skills/SkillList'
 import { ToolList } from '../tools/ToolList'
 import { CronList } from '../cron/CronList'
+import { ApprovalsTab } from '../automation/ApprovalsTab'
+import { PendingMessagesTab } from '../automation/PendingMessagesTab'
+import { ProjectsTab } from '../projects/ProjectsTab'
 import { TraceList } from '../traces/TraceList'
 import { StorageTab } from '../storage/StorageTab'
-import { ChannelList } from '../channels/ChannelList'
 
 export function SettingsView() {
   const settingsTab = useUiStore((s) => s.settingsTab)
   const setSettingsTab = useUiStore((s) => s.setSettingsTab)
   const closeSettings = useUiStore((s) => s.closeSettings)
+  const section = findSettingsSection(settingsTab)
+  const { t } = useTranslation('desktop')
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <h1 className="text-sm font-semibold text-text-primary">Settings</h1>
+        <div>
+          <h1 className="text-sm font-semibold text-text-primary">{t('settings.title')}</h1>
+          <p className="mt-0.5 text-xs text-text-muted">{section ? t(section.labelKey) : settingsTab}</p>
+        </div>
         <button
           onClick={closeSettings}
           className="w-6 h-6 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-surface-tertiary transition-colors"
@@ -33,48 +46,56 @@ export function SettingsView() {
         </button>
       </div>
 
-      {/* Tab bar */}
-      <div className="px-3 pt-2">
-        <SettingsTabBar activeTab={settingsTab} onTabChange={setSettingsTab} />
+      <div className="flex flex-1 min-h-0">
+        <SettingsSidebarNav activeTab={settingsTab} onTabChange={setSettingsTab} />
+        {settingsTab === 'storage' ? (
+          <div className="flex-1 flex flex-col min-w-0 min-h-0 px-5 py-5 canvas-dots">
+            <TabContent tab={settingsTab} />
+          </div>
+        ) : (
+          <div className="flex-1 min-w-0 overflow-y-auto overscroll-contain px-5 py-5 canvas-dots">
+            <TabContent tab={settingsTab} />
+          </div>
+        )}
       </div>
-
-      {/* Tab content */}
-      {settingsTab === 'storage' ? (
-        <div className="flex-1 flex flex-col min-h-0 px-4 py-4 canvas-dots">
-          <div className="bg-surface-secondary border border-border rounded-xl p-5 flex-1 flex flex-col min-h-0">
-            <TabContent tab={settingsTab} />
-          </div>
-        </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 canvas-dots">
-          <div className="bg-surface-secondary border border-border rounded-xl p-5">
-            <TabContent tab={settingsTab} />
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-function TabContent({ tab }: { tab: string }) {
+function TabContent({ tab }: { tab: SettingsTab }) {
   switch (tab) {
+    case 'general': return <GeneralSettingsTab />
     case 'appearance': return <AppearanceTab />
     case 'providers': return <ProviderList />
     case 'agents': return <AgentList />
-    case 'channels': return <ChannelList />
+    case 'channels': return <PlaceholderSection tab={tab} />
     case 'mcp': return <McpServerList />
     case 'skills': return <SkillList />
     case 'tools': return <ToolList />
+    case 'credentials': return <CredentialsTab />
     case 'cron': return <CronList />
+    case 'approvals': return <ApprovalsTab />
+    case 'pending': return <PendingMessagesTab />
+    case 'projects': return <ProjectsTab />
     case 'traces': return <TraceList />
     case 'storage': return <StorageTab />
+    case 'backup': return <BackupRestoreTab />
     case 'about': return <AboutTab />
-    default:
-      return (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-sm text-text-muted">Coming soon</p>
-          <p className="text-xs text-text-muted mt-1">This tab will be available in a future update.</p>
-        </div>
-      )
   }
+}
+
+function PlaceholderSection({ tab }: { tab: SettingsTab }) {
+  const section = findSettingsSection(tab)
+  const { t } = useTranslation('desktop')
+  return (
+    <div className="flex min-h-[320px] flex-col justify-center">
+      <div className="max-w-md">
+        <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{t('settings.status.soon')}</p>
+        <h2 className="mt-2 text-xl font-semibold text-text-primary">{section ? t(section.labelKey) : tab}</h2>
+        <p className="mt-2 text-sm leading-6 text-text-secondary">
+          {t('settings.deferredDescription')}
+        </p>
+      </div>
+    </div>
+  )
 }

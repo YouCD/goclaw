@@ -83,13 +83,13 @@ func builtinToolSeedData() []store.BuiltinToolDef {
 		},
 
 		// sessions
-		{Name: "sessions_list", DisplayName: "List Sessions", Description: "List active chat sessions across all channels", Category: "sessions", Enabled: true},
+		{Name: "sessions_list", DisplayName: "List Sessions", Description: "List active chat sessions", Category: "sessions", Enabled: true},
 		{Name: "session_status", DisplayName: "Session Status", Description: "Get the current status and metadata of a specific chat session", Category: "sessions", Enabled: true},
 		{Name: "sessions_history", DisplayName: "Session History", Description: "Retrieve the message history of a specific chat session", Category: "sessions", Enabled: true},
 		{Name: "sessions_send", DisplayName: "Send to Session", Description: "Send a message to an active chat session on behalf of the agent", Category: "sessions", Enabled: true},
 
 		// messaging
-		{Name: "message", DisplayName: "Message", Description: "Send a proactive message to a user on a connected channel (Telegram, Discord, etc.)", Category: "messaging", Enabled: true},
+		{Name: "message", DisplayName: "Message", Description: "Send a proactive message to a reachable user destination", Category: "messaging", Enabled: true},
 		{Name: "send_file", DisplayName: "Send File", Description: "Send an existing workspace file as an attachment in the current chat (does not create or modify the file)", Category: "messaging", Enabled: true},
 
 		// scheduling

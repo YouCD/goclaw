@@ -6,8 +6,6 @@ import { AgentAvatar } from '../../agents/AgentAvatar'
 import { EditionCompareModal } from '../../common/EditionCompareModal'
 import { wails } from '../../../lib/wails'
 
-const MAX_AGENTS_LITE = 5
-
 export function SidebarHeader() {
   const { t } = useTranslation('agents')
   const { agents, selectedAgent, selectAgent } = useAgents()
@@ -19,8 +17,6 @@ export function SidebarHeader() {
   useEffect(() => {
     wails.getVersion().then(setVersion).catch(() => {})
   }, [])
-
-  const atLimit = agents.length >= MAX_AGENTS_LITE
 
   return (
     <div className="pt-6 px-3 pb-2 space-y-2">
@@ -43,13 +39,12 @@ export function SidebarHeader() {
       {/* Section title + add button */}
       <div className="flex items-center justify-between px-1 pt-1">
         <span className="text-[10px] text-text-muted font-medium tracking-wide">
-          {t('title', 'Agents')} ({agents.length}/{MAX_AGENTS_LITE})
+          {t('title', 'Agents')} ({agents.length})
         </span>
         <button
           onClick={() => openSettings('agents')}
-          disabled={atLimit}
-          className="w-5 h-5 flex items-center justify-center rounded text-text-muted hover:text-accent hover:bg-surface-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-          title={atLimit ? t('limitReached', 'Agent limit reached ({{max}})', { max: MAX_AGENTS_LITE }) : t('createAgent', 'New agent')}
+          className="w-5 h-5 flex items-center justify-center rounded text-text-muted hover:text-accent hover:bg-surface-tertiary transition-colors cursor-pointer"
+          title={t('createAgent', 'New agent')}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />

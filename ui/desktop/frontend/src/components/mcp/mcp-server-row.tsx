@@ -17,6 +17,7 @@ export function McpServerRow({
   server: s, reconnectingId, onReconnect, onEdit, onDelete, onViewTools, onManageGrants,
 }: McpServerRowProps) {
   const { t } = useTranslation(['mcp', 'common'])
+  const scope = s.scope ?? (s.project_id ? 'project' : s.team_id ? 'team' : 'global')
 
   return (
     <tr className="border-b border-border last:border-0 hover:bg-surface-tertiary/30 transition-colors [&>td]:align-middle">
@@ -43,6 +44,12 @@ export function McpServerRow({
             : 'border border-border text-text-muted'
         }`}>
           {s.transport.toUpperCase()}
+        </span>
+      </td>
+      {/* Scope */}
+      <td className="px-4 py-3">
+        <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-text-muted">
+          {t(`scope.values.${scope}`)}
         </span>
       </td>
       {/* Tools */}

@@ -14,11 +14,11 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/bootstrap"
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
+	"github.com/nextlevelbuilder/goclaw/internal/edition"
 	mcpbridge "github.com/nextlevelbuilder/goclaw/internal/mcp"
 	"github.com/nextlevelbuilder/goclaw/internal/permissions"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/sandbox"
-	"github.com/nextlevelbuilder/goclaw/internal/edition"
 	"github.com/nextlevelbuilder/goclaw/internal/skills"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/store/pg"
@@ -217,24 +217,29 @@ func setupToolRegistry(
 			// Per-agent overrides via store.WithShellDenyGroups still win per-key.
 			et.SetGlobalShellDenyGroups(cfg.Tools.ShellDenyGroups)
 			et.DenyPaths(dataDir, ".goclaw/")
-			// Allow skills execution: master-tenant skills-store + all tenant-scoped skills-store dirs.
+			// Allow managed skills execution while keeping tenant/workspace internals denied.
 			et.AllowPathExemptions(
 				".goclaw/skills-store/",
 				filepath.Join(dataDir, "skills-store")+"/",
-				filepath.Join(dataDir, "tenants")+"/",
+				workspace+"/",
 			)
 			// Harden: block access to internal workspace files via shell commands.
 			// Prevents `cat ../config.json`, `cat memory.db` etc. from user workspaces.
-			et.DenyPaths(
+			denyPaths := []string{
 				filepath.Join(workspace, "memory.db"),
 				filepath.Join(workspace, "memory.db-wal"),
 				filepath.Join(workspace, "memory.db-shm"),
 				filepath.Join(workspace, "config.json"),
 				filepath.Join(workspace, "delegate"),
-				filepath.Join(dataDir, "goclaw.db"),
-				filepath.Join(dataDir, "goclaw.db-wal"),
-				filepath.Join(dataDir, "goclaw.db-shm"),
-			)
+			}
+			for _, filename := range config.SQLiteDatabaseFilenames() {
+				denyPaths = append(denyPaths,
+					filepath.Join(dataDir, filename),
+					filepath.Join(dataDir, filename+"-wal"),
+					filepath.Join(dataDir, filename+"-shm"),
+				)
+			}
+			et.DenyPaths(denyPaths...)
 			if cfgPath := os.Getenv("GOCLAW_CONFIG"); cfgPath != "" {
 				et.DenyPaths(cfgPath)
 			}
@@ -248,15 +253,17 @@ func setupToolRegistry(
 	// deny paths add defense-in-depth.
 	internalDenyPaths := []string{
 		"config.json", "memory.db", "memory.db-wal", "memory.db-shm",
-		"goclaw.db", "goclaw.db-wal", "goclaw.db-shm",
 		"memory/", ".media/", ".uploads/", "delegate/",
 	}
 	// read_file: allow .media/ access (uploaded documents accessed via AllowPaths
 	// for backward compat; new uploads go to per-user .uploads/ within workspace).
 	readFileDenyPaths := []string{
 		"config.json", "memory.db", "memory.db-wal", "memory.db-shm",
-		"goclaw.db", "goclaw.db-wal", "goclaw.db-shm",
 		"memory/", "delegate/",
+	}
+	for _, filename := range config.SQLiteDatabaseFilenames() {
+		internalDenyPaths = append(internalDenyPaths, filename, filename+"-wal", filename+"-shm")
+		readFileDenyPaths = append(readFileDenyPaths, filename, filename+"-wal", filename+"-shm")
 	}
 	if rf, ok := toolsReg.Get("read_file"); ok {
 		if t, ok := rf.(*tools.ReadFileTool); ok {
@@ -614,4 +621,3 @@ func setupSkillsSystem(
 
 	return skillsLoader, skillSearchTool, globalSkillsDir, bundledSkillsDir, builtinSkillsDir
 }
-

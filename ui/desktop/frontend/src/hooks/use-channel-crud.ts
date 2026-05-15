@@ -66,7 +66,5 @@ export function useChannelCrud() {
 
   const telegramExists = instances.some((i) => i.channel_type === 'telegram')
   const discordExists = instances.some((i) => i.channel_type === 'discord')
-  const atLimit = instances.length >= 2
-
-  return { instances, loading, atLimit, telegramExists, discordExists, fetchInstances, createInstance, updateInstance, deleteInstance }
+  return { instances, loading, telegramExists, discordExists, fetchInstances, createInstance, updateInstance, deleteInstance }
 }

@@ -5,8 +5,11 @@ import { useTranslation } from 'react-i18next'
 import { Switch } from '../common/Switch'
 import { McpTestResult as McpTestResultDisplay } from './mcp-test-result'
 import { McpTransportFields } from './mcp-transport-fields'
+import { McpScopeGrantsPicker } from './mcp-scope-grants-picker'
+import { buildMcpServerInput, buildMcpTestInput } from './mcp-form-payload'
 import { mcpFormSchema, type MCPFormData } from '../../schemas/mcp.schema'
 import { slugify } from '../../lib/slug'
+import type { AgentData } from '../../types/agent'
 import type { MCPServerData, MCPServerInput, MCPTestResult } from '../../types/mcp'
 
 const TRANSPORTS = ['stdio', 'sse', 'streamable-http'] as const
@@ -15,18 +18,35 @@ interface McpFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   server?: MCPServerData | null
+  agents: AgentData[]
   onSubmit: (data: MCPServerInput) => Promise<unknown>
   onTest: (data: { transport: string; command?: string; args?: string[]; url?: string; headers?: Record<string, string>; env?: Record<string, string> }) => Promise<MCPTestResult>
 }
 
-export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: McpFormDialogProps) {
+export function McpFormDialog({ open, onOpenChange, server, agents, onSubmit, onTest }: McpFormDialogProps) {
   const { t } = useTranslation(['mcp', 'common'])
   const isEdit = Boolean(server)
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<MCPFormData>({
     resolver: zodResolver(mcpFormSchema),
     mode: 'onChange',
-    defaultValues: { name: '', displayName: '', transport: 'stdio', command: '', args: '', url: '', headers: {}, env: {}, toolPrefix: '', timeoutSec: 30, enabled: true },
+    defaultValues: {
+      name: '',
+      displayName: '',
+      transport: 'stdio',
+      command: '',
+      args: '',
+      url: '',
+      headers: {},
+      env: {},
+      toolPrefix: '',
+      timeoutSec: 30,
+      requireUserCredentials: false,
+      enabled: true,
+      scope: 'global',
+      teamId: '',
+      projectId: '',
+    },
   })
 
   // Test connection state (UI-only, not form data)
@@ -47,10 +67,30 @@ export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
         env: server.env ?? {},
         toolPrefix: server.tool_prefix?.replace(/^mcp_/, '') ?? '',
         timeoutSec: server.timeout_sec || 30,
+        requireUserCredentials: server.settings?.require_user_credentials ?? false,
         enabled: server.enabled,
+        scope: server.scope ?? (server.project_id ? 'project' : server.team_id ? 'team' : 'global'),
+        teamId: server.team_id ?? '',
+        projectId: server.project_id ?? '',
       })
     } else {
-      reset({ name: '', displayName: '', transport: 'stdio', command: '', args: '', url: '', headers: {}, env: {}, toolPrefix: '', timeoutSec: 30, enabled: true })
+      reset({
+        name: '',
+        displayName: '',
+        transport: 'stdio',
+        command: '',
+        args: '',
+        url: '',
+        headers: {},
+        env: {},
+        toolPrefix: '',
+        timeoutSec: 30,
+        requireUserCredentials: false,
+        enabled: true,
+        scope: 'global',
+        teamId: '',
+        projectId: '',
+      })
     }
     setTestState('idle')
     setTestResult(null)
@@ -63,22 +103,8 @@ export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
   const env = watch('env')
   const name = watch('name')
 
-  function buildInput(data: MCPFormData): MCPServerInput {
-    const input: MCPServerInput = { name: data.name, display_name: data.displayName || undefined, transport: data.transport, timeout_sec: data.timeoutSec, enabled: data.enabled }
-    if (data.transport === 'stdio') {
-      input.command = data.command
-      input.args = data.args.trim() ? data.args.trim().split(/\s+/) : undefined
-    } else {
-      input.url = data.url
-      if (Object.keys(data.headers).length > 0) input.headers = data.headers
-    }
-    if (Object.keys(data.env).length > 0) input.env = data.env
-    if (data.toolPrefix.trim()) input.tool_prefix = data.toolPrefix.trim()
-    return input
-  }
-
   const onValid = async (data: MCPFormData) => {
-    await onSubmit(buildInput(data))
+    await onSubmit(buildMcpServerInput(data, isEdit))
     onOpenChange(false)
   }
 
@@ -86,17 +112,7 @@ export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
     setTestState('testing')
     setTestResult(null)
     try {
-      const data: Parameters<typeof onTest>[0] = { transport }
-      if (transport === 'stdio') {
-        data.command = watch('command')
-        const a = watch('args').trim()
-        if (a) data.args = a.split(/\s+/)
-      } else {
-        data.url = watch('url')
-        if (Object.keys(headers).length > 0) data.headers = headers
-      }
-      if (Object.keys(env).length > 0) data.env = env
-      const result = await onTest(data)
+      const result = await onTest(buildMcpTestInput(watch()))
       setTestResult(result)
       setTestState(result.success ? 'success' : 'error')
     } catch (err) {
@@ -105,7 +121,9 @@ export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
     }
   }
 
-  const canSubmit = watch('name').trim() && (transport === 'stdio' ? watch('command').trim() : watch('url').trim())
+  const scope = watch('scope')
+  const scopeTargetSelected = scope === 'team' ? Boolean(watch('teamId')?.trim()) : scope === 'project' ? Boolean(watch('projectId')?.trim()) : true
+  const canSubmit = watch('name').trim() && (transport === 'stdio' ? watch('command').trim() : watch('url').trim()) && scopeTargetSelected
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center">
@@ -124,6 +142,7 @@ export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
         {/* Form */}
         <div className="max-h-[70vh] overflow-y-auto p-5 space-y-4">
           {/* Name */}
+          <section className="space-y-3 rounded-lg border border-border p-3">
           <div className="space-y-1">
             <label className="text-xs font-medium text-text-secondary">{t('form.name')}</label>
             <input
@@ -142,8 +161,10 @@ export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
             <label className="text-xs font-medium text-text-secondary">{t('form.displayName')}</label>
             <input {...register('displayName')} placeholder={t('form.displayNamePlaceholder')} className="w-full bg-surface-tertiary border border-border rounded-lg px-3 py-2 text-base md:text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent" />
           </div>
+          </section>
 
           {/* Transport */}
+          <section className="space-y-3 rounded-lg border border-border p-3">
           <div className="space-y-1">
             <label className="text-xs font-medium text-text-secondary">{t('form.transport')}</label>
             <div className="grid grid-cols-3 gap-2">
@@ -162,8 +183,10 @@ export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
             register={register}
             setValue={setValue}
           />
+          </section>
 
           {/* Tool Prefix */}
+          <section className="space-y-3 rounded-lg border border-border p-3">
           <div className="space-y-1">
             <label className="text-xs font-medium text-text-secondary">{t('form.toolPrefix')}</label>
             <div className="flex items-stretch">
@@ -184,11 +207,33 @@ export function McpFormDialog({ open, onOpenChange, server, onSubmit, onTest }: 
             <input type="number" min={1} {...register('timeoutSec', { valueAsNumber: true })} className="w-24 bg-surface-tertiary border border-border rounded-lg px-3 py-2 text-base md:text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent" />
           </div>
 
+          <div className="flex items-center justify-between rounded-lg border border-border p-3">
+            <div>
+              <span className="text-xs font-medium text-text-primary">{t('form.requireUserCredentials')}</span>
+              <p className="mt-0.5 text-[11px] text-text-muted">{t('form.requireUserCredentialsHint')}</p>
+            </div>
+            <Switch checked={watch('requireUserCredentials')} onCheckedChange={(v) => setValue('requireUserCredentials', v)} />
+          </div>
+
           {/* Enabled */}
           <div className="flex items-center justify-between rounded-lg border border-border p-3">
             <span className="text-xs font-medium text-text-primary">{t('form.enabled')}</span>
             <Switch checked={watch('enabled')} onCheckedChange={(v) => setValue('enabled', v)} />
           </div>
+          </section>
+
+          <McpScopeGrantsPicker
+            scope={watch('scope')}
+            teamId={watch('teamId')}
+            projectId={watch('projectId')}
+            disabledScope={isEdit}
+            agents={agents}
+            onScopeChange={(next) => {
+              setValue('scope', next.scope, { shouldValidate: true })
+              setValue('teamId', next.teamId ?? '', { shouldValidate: true })
+              setValue('projectId', next.projectId ?? '', { shouldValidate: true })
+            }}
+          />
         </div>
 
         {/* Footer */}

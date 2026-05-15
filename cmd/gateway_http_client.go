@@ -31,7 +31,7 @@ var healthClient = &http.Client{Timeout: 3 * time.Second}
 func resolveGatewayBaseURL() string {
 	cfg, err := config.Load(resolveConfigPath())
 	if err != nil {
-		return "http://127.0.0.1:18790"
+		return fmt.Sprintf("http://127.0.0.1:%d", config.DefaultGatewayPort)
 	}
 	host := cfg.Gateway.Host
 	if host == "" || host == "0.0.0.0" {
@@ -39,7 +39,7 @@ func resolveGatewayBaseURL() string {
 	}
 	port := cfg.Gateway.Port
 	if port == 0 {
-		port = 18790
+		port = config.DefaultGatewayPort
 	}
 	return fmt.Sprintf("http://%s:%d", host, port)
 }

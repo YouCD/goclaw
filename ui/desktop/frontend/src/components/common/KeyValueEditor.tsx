@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 interface KeyValueEditorProps {
   value: Record<string, string>
@@ -31,6 +31,10 @@ function fromRows(rows: Row[]): Record<string, string> {
 
 export function KeyValueEditor({ value, onChange, sensitivePattern, placeholder }: KeyValueEditorProps) {
   const [rows, setRows] = useState<Row[]>(() => toRows(value))
+
+  useEffect(() => {
+    setRows(toRows(value))
+  }, [value])
 
   function updateAndEmit(updated: Row[]) {
     setRows(updated)

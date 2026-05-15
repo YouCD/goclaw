@@ -18,12 +18,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/nextlevelbuilder/goclaw/internal/version"
 )
 
 const (
 	githubRepo = "nextlevelbuilder/goclaw"
-	tagPrefix  = "lite-v"
 	// maxFileSize limits individual extracted files to 500 MB (decompression bomb guard).
 	maxFileSize = 500 << 20
 )
@@ -55,7 +55,7 @@ type githubAsset struct {
 	BrowserDownloadURL string `json:"browser_download_url"`
 }
 
-// CheckForUpdate queries GitHub Releases for a newer lite-v* release.
+// CheckForUpdate queries GitHub Releases for a newer desktop v4 release.
 // currentVersion should be a semver string like "0.1.0" (no "v" prefix).
 func CheckForUpdate(currentVersion string) (*UpdateInfo, error) {
 	if currentVersion == "" || currentVersion == "dev" {
@@ -81,19 +81,27 @@ func CheckForUpdate(currentVersion string) (*UpdateInfo, error) {
 		return nil, fmt.Errorf("decode releases: %w", err)
 	}
 
+	if info := selectAvailableUpdate(releases, currentVersion, runtime.GOOS, runtime.GOARCH); info != nil {
+		return info, nil
+	}
+
+	return &UpdateInfo{Available: false}, nil
+}
+
+func selectAvailableUpdate(releases []githubRelease, currentVersion, goos, goarch string) *UpdateInfo {
 	for _, rel := range releases {
 		if rel.Draft || rel.Prerelease {
 			continue
 		}
-		if !strings.HasPrefix(rel.TagName, tagPrefix) {
+		if !strings.HasPrefix(rel.TagName, config.DesktopReleaseTagPrefix) {
 			continue
 		}
-		relVersion := strings.TrimPrefix(rel.TagName, tagPrefix)
+		relVersion := strings.TrimPrefix(rel.TagName, config.DesktopReleaseTagPrefix)
 		if !isNewer(relVersion, currentVersion) {
 			continue
 		}
 
-		assetURL := findAsset(rel.Assets, runtime.GOOS, runtime.GOARCH)
+		assetURL := findAsset(rel.Assets, goos, goarch)
 		if assetURL == "" {
 			continue
 		}
@@ -104,10 +112,9 @@ func CheckForUpdate(currentVersion string) (*UpdateInfo, error) {
 			DownloadURL:  assetURL,
 			ReleaseURL:   rel.HTMLURL,
 			ReleaseNotes: rel.Body,
-		}, nil
+		}
 	}
-
-	return &UpdateInfo{Available: false}, nil
+	return nil
 }
 
 // findAsset returns the download URL for the .tar.gz (macOS) or .zip (Windows) asset.

@@ -2,10 +2,10 @@ name: Release Desktop
 
 on:
   push:
-    tags: ['lite-v*']
+    tags: ['lite-v4-*']
 
-# lite-v1.0.0       → stable release (prerelease: false)
-# lite-v1.0.0-beta.1 → beta release  (prerelease: true)
+# lite-v4-1.0.0        → stable release (prerelease: false)
+# lite-v4-1.0.0-beta.1 → beta release  (prerelease: true)
 
 permissions:
   contents: write
@@ -45,7 +45,7 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME#lite-v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF_NAME#lite-v4-}" >> "$GITHUB_OUTPUT"
 
       - name: Patch wails.json version
         working-directory: ui/desktop
@@ -116,7 +116,7 @@ jobs:
       - name: Extract version from tag
         id: version
         shell: bash
-        run: echo "version=${GITHUB_REF_NAME#lite-v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF_NAME#lite-v4-}" >> "$GITHUB_OUTPUT"
 
       - name: Patch wails.json version
         working-directory: ui/desktop
@@ -154,7 +154,7 @@ jobs:
 
       - name: Extract version from tag
         id: version
-        run: echo "version=${GITHUB_REF_NAME#lite-v}" >> "$GITHUB_OUTPUT"
+        run: echo "version=${GITHUB_REF_NAME#lite-v4-}" >> "$GITHUB_OUTPUT"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -169,7 +169,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: "GoClaw Lite v${{ steps.version.outputs.version }}"
+          name: "GoClaw Lite v4 ${{ steps.version.outputs.version }}"
           draft: false
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           generate_release_notes: true

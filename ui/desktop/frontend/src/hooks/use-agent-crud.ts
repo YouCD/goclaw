@@ -3,8 +3,6 @@ import { agentService } from '../services/agent-service'
 import { toast } from '../stores/toast-store'
 import type { AgentData, AgentInput } from '../types/agent'
 
-const MAX_AGENTS_LITE = 5
-
 export function useAgentCrud() {
   const [agents, setAgents] = useState<AgentData[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,7 +65,5 @@ export function useAgentCrud() {
     await agentService.cancelSummon(id)
   }, [])
 
-  const atLimit = agents.length >= MAX_AGENTS_LITE
-
-  return { agents, loading, atLimit, fetchAgents, createAgent, updateAgent, deleteAgent, resummonAgent, cancelSummonAgent }
+  return { agents, loading, fetchAgents, createAgent, updateAgent, deleteAgent, resummonAgent, cancelSummonAgent }
 }

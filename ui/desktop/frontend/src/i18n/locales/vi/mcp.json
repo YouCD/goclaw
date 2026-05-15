@@ -10,11 +10,26 @@
   "columns": {
     "name": "Tên",
     "transport": "Giao thức",
+    "scope": "Phạm vi",
     "tools": "Công cụ",
     "agents": "Agents",
     "enabled": "Bật",
     "createdBy": "Tạo bởi",
     "actions": "Thao tác"
+  },
+  "scope": {
+    "values": {
+      "global": "Toàn workspace",
+      "team": "Team",
+      "project": "Project"
+    },
+    "hints": {
+      "global": "Mọi agent trong workspace đều dùng được.",
+      "team": "Chỉ agent trong team được chọn dùng được.",
+      "project": "Chỉ agent có quyền truy cập project được chọn."
+    },
+    "teamPlaceholder": "Chọn team...",
+    "projectPlaceholder": "Chọn project..."
   },
   "viewTools": "Xem công cụ",
   "manageGrants": "Quản lý quyền",
@@ -55,6 +70,11 @@
     "create": "Tạo",
     "update": "Cập nhật",
     "saving": "Đang lưu...",
+    "scopeTitle": "Phạm vi và grants",
+    "scopeLocked": "Phạm vi không thể đổi sau khi tạo. Dùng Quản lý quyền để đổi agent access.",
+    "grantsAfterCreate": "Agent grants được quản lý sau khi tạo",
+    "grantsAfterCreateHint": "Tạo server trước, kiểm tra tools đã discover, rồi dùng Quản lý quyền để chọn agent access.",
+    "noAgents": "Chưa có agent",
     "errors": {
       "nameRequired": "Tên và giao thức là bắt buộc",
       "nameSlug": "Tên phải là slug hợp lệ (chữ thường, số, dấu gạch ngang)",

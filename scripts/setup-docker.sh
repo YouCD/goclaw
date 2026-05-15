@@ -106,7 +106,7 @@ POSTGRES_PORT=${PG_PORT}
 # PostgreSQL
 POSTGRES_USER=goclaw
 POSTGRES_PASSWORD=${PG_PASSWORD}
-POSTGRES_DB=goclaw
+POSTGRES_DB=goclaw_v4
 EOF
   echo "Generated ${ENV_FILE} with random secrets."
 else
@@ -128,15 +128,31 @@ services:
     environment:
       POSTGRES_USER: \${POSTGRES_USER:-goclaw}
       POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:-goclaw}
-      POSTGRES_DB: \${POSTGRES_DB:-goclaw}
+      POSTGRES_DB: \${POSTGRES_DB:-goclaw_v4}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \${POSTGRES_USER:-goclaw}"]
+      test: ["CMD-SHELL", "pg_isready -U \${POSTGRES_USER:-goclaw} -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
+
+  postgres-init:
+    image: pgvector/pgvector:pg18
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: \${POSTGRES_USER:-goclaw}
+      PGPASSWORD: \${POSTGRES_PASSWORD:-goclaw}
+      POSTGRES_DB: \${POSTGRES_DB:-goclaw_v4}
+    command: >
+      sh -c 'case "\$\$POSTGRES_DB" in *[!A-Za-z0-9_]*|"") echo "invalid POSTGRES_DB"; exit 1;; esac;
+      createdb -d postgres "\$\$POSTGRES_DB" 2>/dev/null || true;
+      psql -d "\$\$POSTGRES_DB" -c "SELECT 1" >/dev/null'
+    restart: "no"
 
   goclaw:
 YAML
@@ -169,7 +185,7 @@ cat >> "$COMPOSE_FILE" <<YAML
       - GOCLAW_CONFIG=/app/data/config.json
       - GOCLAW_SKILLS_DIR=/app/data/skills
       - GOCLAW_WORKSPACE=/app/workspace
-      - GOCLAW_POSTGRES_DSN=postgres://\${POSTGRES_USER:-goclaw}:\${POSTGRES_PASSWORD:-goclaw}@postgres:5432/\${POSTGRES_DB:-goclaw}?sslmode=disable
+      - GOCLAW_POSTGRES_DSN=postgres://\${POSTGRES_USER:-goclaw}:\${POSTGRES_PASSWORD:-goclaw}@postgres:5432/\${POSTGRES_DB:-goclaw_v4}?sslmode=disable
     volumes:
       # Persistent data: config, agent files, runtime packages (pip/npm)
       - goclaw-data:/app/data
@@ -180,8 +196,8 @@ cat >> "$COMPOSE_FILE" <<YAML
       # Storage: uploaded media, documents
       - goclaw-storage:/app/storage
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres-init:
+        condition: service_completed_successfully
     security_opt:
       - no-new-privileges:true
     cap_drop:

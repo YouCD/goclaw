@@ -24,7 +24,7 @@ func setupStoresAndTracing(
 ) (*store.Stores, *tracing.Collector, *tracing.SnapshotWorker) {
 	sqlitePath := cfg.Database.SQLitePath
 	if sqlitePath == "" {
-		sqlitePath = filepath.Join(dataDir, "goclaw.db")
+		sqlitePath = config.DefaultSQLitePath(dataDir)
 	}
 	storeCfg := store.StoreConfig{
 		SQLitePath:       sqlitePath,

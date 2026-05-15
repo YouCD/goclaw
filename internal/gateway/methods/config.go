@@ -2,8 +2,11 @@ package methods
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
-	"log/slog"
+	"errors"
+	"fmt"
+	"sort"
 
 	"github.com/titanous/json5"
 
@@ -22,7 +25,12 @@ type ConfigMethods struct {
 	cfgPath      string
 	secretsStore store.ConfigSecretsStore
 	syncFn       func(ctx context.Context, cfg *config.Config) // nil-safe; syncs non-secret settings to system_configs
-	eventBus     bus.EventPublisher       // nil-safe; broadcasts config change events
+	eventBus     bus.EventPublisher                            // nil-safe; broadcasts config change events
+}
+
+type previousSecret struct {
+	value  string
+	exists bool
 }
 
 func NewConfigMethods(cfg *config.Config, cfgPath string, secretsStore store.ConfigSecretsStore, eventBus bus.EventPublisher) *ConfigMethods {
@@ -125,7 +133,10 @@ func (m *ConfigMethods) handleApply(ctx context.Context, client *gateway.Client,
 	}
 
 	// Extract secrets → save to config_secrets table, strip all from file
-	m.saveSecretsToStore(ctx, newCfg)
+	if err := m.saveSecretsToStore(ctx, newCfg); err != nil {
+		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInternal, i18n.T(locale, i18n.MsgFailedToSave, "config secrets", err.Error())))
+		return
+	}
 	newCfg.StripSecrets()
 
 	// Save to disk
@@ -199,7 +210,10 @@ func (m *ConfigMethods) handlePatch(ctx context.Context, client *gateway.Client,
 	}
 
 	// Extract secrets → save to config_secrets table, strip all from file
-	m.saveSecretsToStore(ctx, merged)
+	if err := m.saveSecretsToStore(ctx, merged); err != nil {
+		client.SendResponse(protocol.NewErrorResponse(req.ID, protocol.ErrInternal, i18n.T(locale, i18n.MsgFailedToSave, "config secrets", err.Error())))
+		return
+	}
 	merged.StripSecrets()
 
 	// Save to disk
@@ -281,17 +295,53 @@ func (m *ConfigMethods) handleSchema(_ context.Context, client *gateway.Client, 
 	}))
 }
 
-// saveSecretsToStore extracts non-LLM/non-channel secrets from the config
-// and persists them to the config_secrets table.
-func (m *ConfigMethods) saveSecretsToStore(ctx context.Context, cfg *config.Config) {
-	if m.secretsStore == nil {
-		return
-	}
-
+// saveSecretsToStore extracts config-backed secrets and persists them to the
+// encrypted config_secrets table before config.json is written without secrets.
+func (m *ConfigMethods) saveSecretsToStore(ctx context.Context, cfg *config.Config) error {
 	secrets := cfg.ExtractDBSecrets()
-	for key, value := range secrets {
+	if len(secrets) == 0 {
+		return nil
+	}
+	if m.secretsStore == nil {
+		return fmt.Errorf("config secrets store is not configured")
+	}
+	keys := make([]string, 0, len(secrets))
+	for key := range secrets {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	previous := make(map[string]previousSecret, len(keys))
+	saved := make([]string, 0, len(keys))
+	for _, key := range keys {
+		old, err := m.secretsStore.Get(ctx, key)
+		switch {
+		case err == nil:
+			previous[key] = previousSecret{value: old, exists: true}
+		case errors.Is(err, sql.ErrNoRows):
+			previous[key] = previousSecret{}
+		default:
+			m.rollbackSavedSecrets(ctx, previous, saved)
+			return fmt.Errorf("read existing %s: %w", key, err)
+		}
+		value := secrets[key]
 		if err := m.secretsStore.Set(ctx, key, value); err != nil {
-			slog.Warn("failed to save config secret", "key", key, "error", err)
+			m.rollbackSavedSecrets(ctx, previous, saved)
+			return fmt.Errorf("%s: %w", key, err)
+		}
+		saved = append(saved, key)
+	}
+	return nil
+}
+
+func (m *ConfigMethods) rollbackSavedSecrets(ctx context.Context, previous map[string]previousSecret, saved []string) {
+	for i := len(saved) - 1; i >= 0; i-- {
+		key := saved[i]
+		prev := previous[key]
+		if prev.exists {
+			_ = m.secretsStore.Set(ctx, key, prev.value)
+		} else {
+			_ = m.secretsStore.Delete(ctx, key)
 		}
 	}
 }

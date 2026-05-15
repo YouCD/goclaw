@@ -38,12 +38,9 @@ describe('VoicePicker (desktop)', () => {
     const onChange = vi.fn()
     renderWithI18n(<VoicePicker value={null} onChange={onChange} />)
 
-    // Wait for voices to load
-    await waitFor(() => expect(screen.queryByText('Loading voices…')).toBeNull())
-
-    // Open combobox by clicking the input
-    const input = screen.getByRole('textbox')
-    fireEvent.focus(input)
+    const trigger = screen.getByRole('button', { name: /giọng đọc|voice/i })
+    await waitFor(() => expect(trigger).not.toHaveTextContent(/đang tải|loading/i))
+    fireEvent.click(trigger)
 
     // Click Rachel option
     await waitFor(() => {
@@ -69,8 +66,9 @@ describe('VoicePicker (desktop)', () => {
   it('(d) loads voices via API mock — Rachel appears in list', async () => {
     renderWithI18n(<VoicePicker value={null} onChange={() => {}} />)
 
-    const input = screen.getByRole('textbox')
-    fireEvent.focus(input)
+    const trigger = screen.getByRole('button', { name: /giọng đọc|voice/i })
+    await waitFor(() => expect(trigger).not.toHaveTextContent(/đang tải|loading/i))
+    fireEvent.click(trigger)
 
     await waitFor(() => {
       expect(screen.getByText('Rachel')).toBeInTheDocument()

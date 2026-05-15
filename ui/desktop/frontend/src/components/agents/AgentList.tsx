@@ -11,7 +11,7 @@ import type { AgentData, AgentInput } from '../../types/agent'
 
 export function AgentList() {
   const { t } = useTranslation(['agents', 'common'])
-  const { agents, loading, atLimit, createAgent, updateAgent, deleteAgent, resummonAgent, cancelSummonAgent, fetchAgents } = useAgentCrud()
+  const { agents, loading, createAgent, updateAgent, deleteAgent, resummonAgent, cancelSummonAgent, fetchAgents } = useAgentCrud()
   const setStoreAgents = useAgentStore((s) => s.setAgents)
 
   const [formOpen, setFormOpen] = useState(false)
@@ -77,16 +77,11 @@ export function AgentList() {
           <h3 className="text-sm font-semibold text-text-primary">{t('agents:title')}</h3>
           <button
             onClick={() => setFormOpen(true)}
-            disabled={atLimit}
-            className="px-3 py-1.5 text-xs bg-accent text-white rounded-lg font-medium hover:bg-accent-hover transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 text-xs bg-accent text-white rounded-lg font-medium hover:bg-accent-hover transition-colors"
           >
             + {t('agents:createAgent')}
           </button>
         </div>
-
-        {atLimit && (
-          <p className="text-xs text-warning">Max 5 agents in Lite edition.</p>
-        )}
 
         {agents.length === 0 ? (
           <p className="text-xs text-text-muted py-4 text-center">{t('agents:emptyTitle')}</p>

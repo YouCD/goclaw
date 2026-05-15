@@ -134,6 +134,27 @@
       "title": "Kỹ năng ghim",
       "addPlaceholder": "Thêm kỹ năng...",
       "hint": "Kỹ năng ghim luôn được nhúng vào system prompt. Các kỹ năng khác dùng skill_search."
+    },
+    "configShell": {
+      "identityModel": "Nhận dạng & Model",
+      "identityModelDesc": "Tên, trạng thái, provider, model và giới hạn ngân sách.",
+      "reasoningPrompt": "Reasoning & Prompt",
+      "reasoningPromptDesc": "Chế độ system prompt và ghi đè extended thinking.",
+      "memoryContext": "Memory & Context",
+      "memoryContextDesc": "Memory dài hạn, context pruning và compaction.",
+      "toolsSandbox": "Tools & Sandbox",
+      "toolsSandboxDesc": "Giới hạn subagent, tool policy và cách ly thực thi.",
+      "skillsMcp": "Skills & MCP",
+      "skillsMcpDesc": "Skill ghim, skill được cấp và quyền truy cập MCP server.",
+      "voice": "Voice / TTS",
+      "voiceDesc": "Voice và tham số fine-tune riêng cho agent.",
+      "evolution": "Tiến hóa",
+      "evolutionDesc": "Cài đặt tự tiến hóa, chỉ số, đề xuất và guardrail.",
+      "files": "Tệp",
+      "filesDesc": "File ngữ cảnh agent và công cụ regenerate.",
+      "unsaved": "Chưa lưu",
+      "unsavedHint": "Có thay đổi chưa lưu trong cấu hình agent này.",
+      "noChanges": "Không có thay đổi chờ lưu."
     }
   },
   "general": {

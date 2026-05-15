@@ -447,6 +447,110 @@ func TestExecute_AllowsCurrentWorkspaceNestedUnderDeniedRoot(t *testing.T) {
 	}
 }
 
+func TestExecute_AllowsWorkspaceRootNestedUnderDeniedRoot(t *testing.T) {
+	dataDir := t.TempDir()
+	workspace := filepath.Join(dataDir, "workspace")
+	if err := os.MkdirAll(workspace, 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	tool := NewExecTool("/workspace", false)
+	tool.DenyPaths(dataDir, ".goclaw/")
+	tool.AllowPathExemptions(workspace + string(filepath.Separator))
+
+	target := filepath.Join(workspace, "notes.txt")
+	ctx := WithToolWorkspace(context.Background(), workspace)
+	result := tool.Execute(ctx, map[string]any{
+		"command": "printf '%s' " + target,
+	})
+
+	if strings.Contains(result.ForLLM, "command denied by safety policy") {
+		t.Fatalf("expected workspace path to bypass dataDir deny, got: %s", result.ForLLM)
+	}
+	if !strings.Contains(result.ForLLM, target) {
+		t.Fatalf("expected command output to include workspace path, got: %s", result.ForLLM)
+	}
+}
+
+func TestExecute_DoesNotExemptWorkspaceHiddenConfigDir(t *testing.T) {
+	dataDir := t.TempDir()
+	workspace := filepath.Join(dataDir, "workspace")
+	if err := os.MkdirAll(filepath.Join(workspace, ".goclaw"), 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	tool := NewExecTool("/workspace", false)
+	tool.DenyPaths(dataDir, ".goclaw/")
+	tool.AllowPathExemptions(workspace + string(filepath.Separator))
+
+	ctx := WithToolWorkspace(context.Background(), workspace)
+	result := tool.Execute(ctx, map[string]any{
+		"command": "printf '%s' " + filepath.Join(workspace, ".goclaw", "secrets.json"),
+	})
+
+	if !strings.Contains(result.ForLLM, "command denied by safety policy") {
+		t.Fatalf("expected workspace-local .goclaw path to remain denied, got: %s", result.ForLLM)
+	}
+}
+
+func TestExecute_DoesNotExemptWorkspaceInternalFiles(t *testing.T) {
+	dataDir := t.TempDir()
+	workspace := filepath.Join(dataDir, "workspace")
+	if err := os.MkdirAll(filepath.Join(workspace, "delegate"), 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	tool := NewExecTool("/workspace", false)
+	tool.DenyPaths(
+		dataDir,
+		filepath.Join(workspace, "memory.db"),
+		filepath.Join(workspace, "memory.db-wal"),
+		filepath.Join(workspace, "memory.db-shm"),
+		filepath.Join(workspace, "config.json"),
+		filepath.Join(workspace, "delegate"),
+	)
+	tool.AllowPathExemptions(workspace + string(filepath.Separator))
+	ctx := WithToolWorkspace(context.Background(), workspace)
+
+	for _, target := range []string{
+		filepath.Join(workspace, "memory.db"),
+		filepath.Join(workspace, "memory.db-wal"),
+		filepath.Join(workspace, "memory.db-shm"),
+		filepath.Join(workspace, "config.json"),
+		filepath.Join(workspace, "delegate", "task.json"),
+	} {
+		result := tool.Execute(ctx, map[string]any{"command": "printf '%s' " + target})
+		if !strings.Contains(result.ForLLM, "command denied by safety policy") {
+			t.Fatalf("expected %s to remain denied, got: %s", target, result.ForLLM)
+		}
+	}
+}
+
+func TestExecute_TenantRootExemptionDoesNotBypassWorkspaceInternalFiles(t *testing.T) {
+	dataDir := t.TempDir()
+	workspace := filepath.Join(dataDir, "tenants", "acme", "workspace")
+	if err := os.MkdirAll(filepath.Join(workspace, "delegate"), 0755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	tool := NewExecTool("/workspace", false)
+	tool.DenyPaths(
+		dataDir,
+		filepath.Join(workspace, "config.json"),
+		filepath.Join(workspace, "memory.db"),
+		filepath.Join(workspace, "delegate"),
+	)
+	tool.AllowPathExemptions(filepath.Join(dataDir, "tenants") + string(filepath.Separator))
+	ctx := WithToolWorkspace(context.Background(), workspace)
+
+	for _, target := range []string{
+		filepath.Join(workspace, "config.json"),
+		filepath.Join(workspace, "memory.db"),
+		filepath.Join(workspace, "delegate", "task.json"),
+	} {
+		result := tool.Execute(ctx, map[string]any{"command": "printf '%s' " + target})
+		if !strings.Contains(result.ForLLM, "command denied by safety policy") {
+			t.Fatalf("expected tenant workspace internal path %s to remain denied, got: %s", target, result.ForLLM)
+		}
+	}
+}
+
 func TestExecute_AllowsCurrentTeamWorkspaceNestedUnderDeniedRoot(t *testing.T) {
 	dataDir := t.TempDir()
 	teamWorkspace := filepath.Join(dataDir, "tenants", "acme", "teams", "team-123")

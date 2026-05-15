@@ -1,8 +1,12 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import type {
-  AgentData, ContextPruningConfig, SubagentsConfig, ToolPolicyConfig,
+  AgentData, ContextPruningConfig, MemoryConfig, SubagentsConfig, ToolPolicyConfig,
   SandboxConfig, AgentReasoningConfig, ReasoningOverrideMode,
 } from '../types/agent'
+
+function sameJSON(a: unknown, b: unknown) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
 
 export function useAgentDetailState(
   agent: AgentData,
@@ -46,6 +50,9 @@ export function useAgentDetailState(
   // --- Compaction ---
   const [compactionConfig, setCompactionConfig] = useState(agent.compaction_config ?? {})
 
+  // --- Memory ---
+  const [memoryConfig, setMemoryConfig] = useState<MemoryConfig | null>(agent.memory_config ?? null)
+
   // --- Subagents ---
   const [subEnabled, setSubEnabled] = useState(agent.subagents_config != null)
   const [subConfig, setSubConfig] = useState<SubagentsConfig>(agent.subagents_config ?? {})
@@ -67,6 +74,41 @@ export function useAgentDetailState(
   const [saveBlocked, setSaveBlocked] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+
+  const isDirty = useMemo(() => (
+    emoji !== (agent.emoji ?? (agent.other_config?.emoji as string) ?? '🤖') ||
+    displayName !== (agent.display_name ?? '') ||
+    description !== (agent.agent_description ?? (agent.other_config?.description as string) ?? '') ||
+    status !== (agent.status ?? 'active') ||
+    isDefault !== (agent.is_default ?? false) ||
+    provider !== agent.provider ||
+    model !== agent.model ||
+    contextWindow !== (agent.context_window ?? 200000) ||
+    maxToolIterations !== (agent.max_tool_iterations ?? 25) ||
+    selfEvolve !== !!(agent.self_evolve ?? agent.other_config?.self_evolve) ||
+    skillLearning !== !!(agent.skill_evolve ?? agent.other_config?.skill_learning) ||
+    skillNudgeInterval !== (agent.skill_nudge_interval ?? (agent.other_config?.skill_nudge_interval as number) ?? 15) ||
+    promptMode !== ((agent.other_config?.prompt_mode as string) || 'full') ||
+    reasoningMode !== (((agent.reasoning_config ?? agent.other_config?.reasoning ?? {}) as AgentReasoningConfig).override_mode ?? 'inherit') ||
+    thinkingLevel !== (agent.thinking_level ?? ((agent.reasoning_config ?? agent.other_config?.reasoning ?? {}) as AgentReasoningConfig).effort ?? 'off') ||
+    pruningEnabled !== (agent.context_pruning != null) ||
+    !sameJSON(pruningConfig, agent.context_pruning ?? {}) ||
+    !sameJSON(compactionConfig, agent.compaction_config ?? {}) ||
+    !sameJSON(memoryConfig, agent.memory_config ?? null) ||
+    subEnabled !== (agent.subagents_config != null) ||
+    !sameJSON(subConfig, agent.subagents_config ?? {}) ||
+    toolsEnabled !== (agent.tools_config != null) ||
+    !sameJSON(toolsConfig, agent.tools_config ?? {}) ||
+    sandboxEnabled !== (agent.sandbox_config != null) ||
+    !sameJSON(sandboxConfig, agent.sandbox_config ?? {}) ||
+    !sameJSON(pinnedSkills, (agent.other_config?.pinned_skills as string[]) ?? [])
+  ), [
+    agent, emoji, displayName, description, status, isDefault, provider, model,
+    contextWindow, maxToolIterations, selfEvolve, skillLearning, skillNudgeInterval,
+    promptMode, reasoningMode, thinkingLevel, pruningEnabled, pruningConfig,
+    compactionConfig, memoryConfig, subEnabled, subConfig, toolsEnabled, toolsConfig,
+    sandboxEnabled, sandboxConfig, pinnedSkills,
+  ])
 
   const handleSave = useCallback(async () => {
     setSaving(true)
@@ -117,6 +159,7 @@ export function useAgentDetailState(
         other_config: Object.keys(otherConfig).length > 0 ? otherConfig : {},
         context_pruning: pruningEnabled ? pruningConfig : null,
         compaction_config: compactionConfig,
+        memory_config: memoryConfig,
         subagents_config: subEnabled ? subConfig : null,
         tools_config: toolsEnabled ? toolsConfig : {},
         sandbox_config: sandboxEnabled ? sandboxConfig : null,
@@ -131,7 +174,7 @@ export function useAgentDetailState(
     agent, emoji, displayName, description, selfEvolve, skillLearning, skillNudgeInterval,
     promptMode, reasoningMode, thinkingLevel, pinnedSkills,
     provider, model, contextWindow, maxToolIterations, isDefault, status,
-    pruningEnabled, pruningConfig, compactionConfig,
+    pruningEnabled, pruningConfig, compactionConfig, memoryConfig,
     subEnabled, subConfig, toolsEnabled, toolsConfig, sandboxEnabled, sandboxConfig,
     onSave, onClose,
   ])
@@ -154,6 +197,8 @@ export function useAgentDetailState(
     pruningEnabled, setPruningEnabled, pruningConfig, setPruningConfig,
     // Compaction
     compactionConfig, setCompactionConfig,
+    // Memory
+    memoryConfig, setMemoryConfig,
     // Subagents
     subEnabled, setSubEnabled, subConfig, setSubConfig,
     // Tool policy
@@ -163,6 +208,6 @@ export function useAgentDetailState(
     // Pinned skills
     pinnedSkills, setPinnedSkills,
     // Save
-    saveBlocked, setSaveBlocked, saving, saveError, handleSave,
+    saveBlocked, setSaveBlocked, saving, saveError, isDirty, handleSave,
   }
 }

@@ -4,9 +4,20 @@ import { useUiStore } from './stores/ui-store'
 import { AppShell } from './components/layout/AppShell'
 import { ChatCanvas } from './components/chat/ChatCanvas'
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard'
+import { AuthSetupPanel } from './components/onboarding/AuthSetupPanel'
 import { wails } from './lib/wails'
-import { initWsClient } from './lib/ws'
+import { getWsClient, initWsClient } from './lib/ws'
 import { initApiClient } from './lib/api'
+import {
+  bootstrapRoot,
+  getBootstrapStatus,
+  login,
+  refreshAuth,
+  saveAuthTokens,
+  type AuthResult,
+  type BootstrapInitPayload,
+  type LoginPayload,
+} from './lib/auth'
 import { useSessionStore } from './stores/session-store'
 import { useChatMessageStore } from './stores/chat-message-store'
 import { useChatActivityStore } from './stores/chat-activity-store'
@@ -48,16 +59,48 @@ function AppReady() {
   )
 }
 
+type AppStage = 'starting' | 'bootstrap' | 'login' | 'onboarding' | 'ready' | 'error'
+
 function App() {
   const theme = useUiStore((s) => s.theme)
-  const onboarded = useUiStore((s) => s.onboarded)
-  const completeOnboarding = useUiStore((s) => s.completeOnboarding)
   const [ready, setReady] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
+  const [stage, setStage] = useState<AppStage>('starting')
+  const [gatewayUrl, setGatewayUrl] = useState('')
+  const [gatewayToken, setGatewayToken] = useState('')
+  const [bootstrapToken, setBootstrapToken] = useState('')
+  const [initError, setInitError] = useState('')
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
+
+  const startAuthenticatedClients = async (baseUrl: string, localGatewayToken: string, auth: AuthResult) => {
+    await saveAuthTokens(auth)
+    const api = initApiClient(baseUrl, localGatewayToken, auth.accessToken)
+    api.setRefreshHandler(async () => {
+      const stored = await wails.getAuthTokens()
+      try {
+        const refreshed = await refreshAuth(baseUrl, stored.refreshToken)
+        await saveAuthTokens(refreshed)
+        try { getWsClient().setAccessToken(refreshed.accessToken) } catch { /* ws may not be initialized */ }
+        return refreshed
+      } catch {
+        const latest = await wails.getAuthTokens()
+        if (latest.refreshToken && latest.refreshToken !== stored.refreshToken) {
+          try { getWsClient().setAccessToken(latest.accessToken) } catch { /* ws may not be initialized */ }
+          return latest
+        }
+        await wails.clearAuthTokens()
+        try { getWsClient().close() } catch { /* ws may not be initialized */ }
+        setStage('login')
+        return null
+      }
+    })
+    const wsUrl = baseUrl.replace(/^http/, 'ws') + '/ws'
+    const ws = initWsClient(wsUrl, localGatewayToken, auth.accessToken)
+    ws.setRefreshHandler(() => api.refreshAuth())
+  }
 
   useEffect(() => {
     const splashMin = new Promise((r) => setTimeout(r, 2500))
@@ -78,25 +121,37 @@ function App() {
         console.warn('[app] failed to get token:', e)
       }
 
-      const gatewayUrl = await wails.getGatewayURL()
-      const wsUrl = gatewayUrl.replace(/^http/, 'ws') + '/ws'
-
-      initWsClient(wsUrl, token)
-      const api = initApiClient(gatewayUrl, token)
+      const baseUrl = await wails.getGatewayURL()
+      setGatewayUrl(baseUrl)
+      setGatewayToken(token)
       setReady(true)
 
-      // Auto-detect empty DB → reset onboarded flag (handles DB deletion)
       try {
-        const [pRes, aRes] = await Promise.allSettled([
-          api.get<{ providers?: unknown[] | null }>('/v1/providers'),
-          api.get<{ agents?: unknown[] | null }>('/v1/agents'),
-        ])
-        const hasProviders = pRes.status === 'fulfilled' && (pRes.value.providers?.length ?? 0) > 0
-        const hasAgents = aRes.status === 'fulfilled' && (aRes.value.agents?.length ?? 0) > 0
-        if (!hasProviders && !hasAgents) {
-          useUiStore.getState().resetOnboarding()
+        const status = await getBootstrapStatus(baseUrl)
+        if (!status.bootstrapped) {
+          const setupToken = await wails.getBootstrapToken()
+          setBootstrapToken(setupToken)
+          setStage('bootstrap')
+          return
         }
-      } catch { /* ignore — onboarding wizard will handle */ }
+
+        const stored = await wails.getAuthTokens()
+        if (stored.refreshToken) {
+          try {
+            const refreshed = await refreshAuth(baseUrl, stored.refreshToken)
+            await startAuthenticatedClients(baseUrl, token, refreshed)
+            setStage('onboarding')
+            return
+          } catch {
+            await wails.clearAuthTokens()
+          }
+        }
+
+        setStage('login')
+      } catch (err) {
+        setInitError(err instanceof Error ? err.message : String(err))
+        setStage('error')
+      }
     }
 
     // Wait for both gateway init AND minimum splash duration
@@ -107,8 +162,49 @@ function App() {
     return <SplashScreen ready={ready} />
   }
 
-  if (!onboarded) {
-    return <OnboardingWizard onComplete={completeOnboarding} />
+  if (stage === 'bootstrap') {
+    return (
+      <AuthSetupPanel
+        mode="bootstrap"
+        onBootstrap={async (payload: BootstrapInitPayload) => {
+          const auth = await bootstrapRoot(gatewayUrl, bootstrapToken, payload)
+          await startAuthenticatedClients(gatewayUrl, gatewayToken, auth)
+          setStage('onboarding')
+          return auth
+        }}
+        onLogin={(payload: LoginPayload) => login(gatewayUrl, payload)}
+      />
+    )
+  }
+
+  if (stage === 'login') {
+    return (
+      <AuthSetupPanel
+        mode="login"
+        onBootstrap={(payload: BootstrapInitPayload) => bootstrapRoot(gatewayUrl, bootstrapToken, payload)}
+        onLogin={async (payload: LoginPayload) => {
+          const auth = await login(gatewayUrl, payload)
+          await startAuthenticatedClients(gatewayUrl, gatewayToken, auth)
+          setStage('onboarding')
+          return auth
+        }}
+      />
+    )
+  }
+
+  if (stage === 'onboarding') {
+    return <OnboardingWizard onComplete={() => setStage('ready')} />
+  }
+
+  if (stage === 'error') {
+    return (
+      <div className="h-dvh flex items-center justify-center bg-surface-primary px-4">
+        <div className="max-w-md rounded-xl border border-border bg-surface-secondary p-6 text-center">
+          <h1 className="text-lg font-semibold text-text-primary">Startup failed</h1>
+          <p className="mt-2 text-sm text-text-muted">{initError}</p>
+        </div>
+      </div>
+    )
   }
 
   return (

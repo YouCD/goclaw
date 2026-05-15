@@ -2,7 +2,7 @@
 #
 # Usage:
 #   irm https://raw.githubusercontent.com/nextlevelbuilder/goclaw/main/scripts/install-lite.ps1 | iex
-#   .\install-lite.ps1 -Version lite-v0.1.0
+#   .\install-lite.ps1 -Version lite-v4-0.1.0
 
 param([string]$Version = "")
 
@@ -29,7 +29,7 @@ if (-not $Version) {
         Write-Host "Check: https://github.com/$Repo/releases" -ForegroundColor Yellow
         Exit-WithPause 1
     }
-    $latest = $releases | Where-Object { $_.tag_name -like "lite-v*" -and -not $_.prerelease -and -not $_.draft } | Select-Object -First 1
+    $latest = $releases | Where-Object { $_.tag_name -like "lite-v4-*" -and -not $_.prerelease -and -not $_.draft } | Select-Object -First 1
     if (-not $latest) {
         Write-Host "No desktop release found." -ForegroundColor Red
         Write-Host "Check: https://github.com/$Repo/releases" -ForegroundColor Yellow
@@ -38,7 +38,7 @@ if (-not $Version) {
     $Version = $latest.tag_name
 }
 
-$Semver = $Version -replace "^lite-v", ""
+$Semver = $Version -replace "^lite-v4-", ""
 Write-Host "-> Installing GoClaw Lite v$Semver..." -ForegroundColor Cyan
 
 # ── Download ──

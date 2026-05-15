@@ -20,13 +20,12 @@ interface FeatureGroup {
 
 const FEATURES: FeatureGroup[] = [
   {
-    group: 'limits',
+    group: 'runtime',
     rows: [
-      { key: 'agents', lite: 'Max 5', standard: true },
-      { key: 'teams', lite: 'Max 1', standard: true },
-      { key: 'teamMembers', lite: 'Max 5', standard: true },
-      { key: 'sessions', lite: 'Max 50', standard: true },
-      { key: 'channels', lite: '1 Telegram + 1 Discord', standard: true },
+      { key: 'database', lite: 'SQLite', standard: 'PostgreSQL' },
+      { key: 'deployment', lite: 'Local desktop', standard: 'Server / Docker' },
+      { key: 'memory', lite: 'FTS5', standard: 'pgvector' },
+      { key: 'users', lite: 'Local admin', standard: 'Multi-user' },
     ],
   },
   {
@@ -36,7 +35,6 @@ const FEATURES: FeatureGroup[] = [
       { key: 'tools', lite: true, standard: true },
       { key: 'mcpServers', lite: true, standard: true },
       { key: 'skills', lite: true, standard: true },
-      { key: 'memory', lite: 'FTS5', standard: 'pgvector' },
       { key: 'cron', lite: true, standard: true },
       { key: 'traces', lite: 'Compact', standard: 'Full' },
     ],
@@ -51,8 +49,8 @@ const FEATURES: FeatureGroup[] = [
       { key: 'knowledgeGraph', lite: false, standard: true },
       { key: 'vectorSearch', lite: false, standard: true },
       { key: 'rbac', lite: false, standard: true },
-      { key: 'multiTenant', lite: false, standard: true },
-      { key: 'tenantUsers', lite: false, standard: true },
+      { key: 'workspaceIsolation', lite: false, standard: true },
+      { key: 'userManagement', lite: false, standard: true },
       { key: 'agentLinks', lite: false, standard: true },
       { key: 'activityLogs', lite: false, standard: true },
       { key: 'apiKeys', lite: false, standard: true },

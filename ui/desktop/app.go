@@ -12,10 +12,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/nextlevelbuilder/goclaw/cmd"
+	"github.com/nextlevelbuilder/goclaw/internal/config"
+	httpapi "github.com/nextlevelbuilder/goclaw/internal/http"
 	"github.com/nextlevelbuilder/goclaw/internal/updater"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -27,12 +30,19 @@ type App struct {
 	gatewayToken string
 	gatewayPort  int
 	lastUpdate   *updater.UpdateInfo // cached update info from last check
+	legacyNotice *LegacyDataNotice
+}
+
+// LegacyDataNotice tells the frontend that v3 data exists and remains untouched.
+type LegacyDataNotice struct {
+	LegacyDataDir string `json:"legacyDataDir"`
+	DataDir       string `json:"dataDir"`
 }
 
 // NewApp creates a new App instance with default port.
 func NewApp() *App {
 	return &App{
-		gatewayPort: 18790,
+		gatewayPort: config.DesktopGatewayPort,
 	}
 }
 
@@ -40,10 +50,7 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
-	// Resolve port from env or use default.
-	if p := os.Getenv("GOCLAW_PORT"); p != "" {
-		fmt.Sscanf(p, "%d", &a.gatewayPort)
-	}
+	dataDir := a.configureDesktopRuntime()
 
 	// Ensure secrets (encryption key + gateway token) via OS keyring or file fallback.
 	encKey, gwToken, err := EnsureSecrets()
@@ -57,20 +64,12 @@ func (a *App) startup(ctx context.Context) {
 	os.Setenv("GOCLAW_ENCRYPTION_KEY", encKey)
 	os.Setenv("GOCLAW_GATEWAY_TOKEN", gwToken)
 	os.Setenv("GOCLAW_STORAGE_BACKEND", "sqlite")
-	os.Setenv("GOCLAW_DESKTOP", "1")
 	// Bind to localhost only — desktop has no reason to expose on LAN.
 	if os.Getenv("GOCLAW_HOST") == "" {
 		os.Setenv("GOCLAW_HOST", "127.0.0.1")
 	}
 	slog.Info("desktop secrets configured", "token_len", len(gwToken), "token_prefix", gwToken[:min(8, len(gwToken))])
 
-	// Ensure data directory exists.
-	dataDir := os.Getenv("GOCLAW_DATA_DIR")
-	if dataDir == "" {
-		home, _ := os.UserHomeDir()
-		dataDir = home + "/.goclaw/data"
-		os.Setenv("GOCLAW_DATA_DIR", dataDir)
-	}
 	os.MkdirAll(dataDir, 0755)
 
 	// Start gateway in background.
@@ -80,6 +79,53 @@ func (a *App) startup(ctx context.Context) {
 
 	// Check for updates after gateway is ready, then every 6 hours.
 	go a.updateLoop()
+}
+
+func (a *App) configureDesktopRuntime() string {
+	os.Setenv("GOCLAW_DESKTOP", "1")
+
+	if os.Getenv("GOCLAW_PORT") == "" {
+		os.Setenv("GOCLAW_PORT", config.DesktopDefaultPort())
+	}
+	port, err := strconv.Atoi(os.Getenv("GOCLAW_PORT"))
+	if err != nil || port <= 0 {
+		slog.Warn("invalid GOCLAW_PORT for desktop; using default", "value", os.Getenv("GOCLAW_PORT"), "default", config.DesktopGatewayPort)
+		port = config.DesktopGatewayPort
+		os.Setenv("GOCLAW_PORT", config.DesktopDefaultPort())
+	}
+	a.gatewayPort = port
+
+	dataDir := os.Getenv("GOCLAW_DATA_DIR")
+	if dataDir == "" {
+		dataDir = config.DesktopDataDir
+	}
+	dataDir = config.ExpandHome(dataDir)
+	os.Setenv("GOCLAW_DATA_DIR", dataDir)
+
+	legacyDataDir := config.ExpandHome(config.DefaultDataDir)
+	if pathExists(legacyDataDir) && !pathExists(dataDir) && filepath.Clean(legacyDataDir) != filepath.Clean(dataDir) {
+		a.legacyNotice = &LegacyDataNotice{LegacyDataDir: legacyDataDir, DataDir: dataDir}
+		slog.Info("desktop v3 data preserved; v4 starts fresh", "legacyDataDir", legacyDataDir, "dataDir", dataDir)
+	}
+
+	if os.Getenv("GOCLAW_SQLITE_PATH") == "" {
+		os.Setenv("GOCLAW_SQLITE_PATH", desktopSQLitePath(dataDir))
+	} else {
+		os.Setenv("GOCLAW_SQLITE_PATH", config.ExpandHome(os.Getenv("GOCLAW_SQLITE_PATH")))
+	}
+	workspace := os.Getenv("GOCLAW_WORKSPACE")
+	if workspace == "" {
+		workspace = config.DesktopWorkspaceDir
+	}
+	workspace = config.ExpandHome(workspace)
+	os.Setenv("GOCLAW_WORKSPACE", workspace)
+	_ = os.MkdirAll(workspace, 0755)
+	return dataDir
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // waitForGateway polls the health endpoint until the gateway is ready or times out.
@@ -117,9 +163,32 @@ func (a *App) GetGatewayToken() string {
 	return a.gatewayToken
 }
 
+// GetBootstrapToken exposes the in-memory bootstrap token to the trusted
+// desktop frontend while the first-user setup gate is open.
+func (a *App) GetBootstrapToken() string {
+	return httpapi.CurrentBootstrapToken()
+}
+
+func (a *App) GetAuthTokens() (AuthTokens, error) {
+	return GetAuthTokens()
+}
+
+func (a *App) SaveAuthTokens(accessToken, refreshToken string) error {
+	return SaveAuthTokens(accessToken, refreshToken)
+}
+
+func (a *App) ClearAuthTokens() error {
+	return ClearAuthTokens()
+}
+
 // GetGatewayPort returns the gateway port number.
 func (a *App) GetGatewayPort() int {
 	return a.gatewayPort
+}
+
+// GetLegacyDataNotice returns v3-preservation metadata for the desktop UI.
+func (a *App) GetLegacyDataNotice() *LegacyDataNotice {
+	return a.legacyNotice
 }
 
 // IsGatewayReady checks if the gateway health endpoint is responding.
@@ -264,10 +333,9 @@ func (a *App) checkAndEmitUpdate() {
 func (a *App) GetDataDir() string {
 	dir := os.Getenv("GOCLAW_DATA_DIR")
 	if dir == "" {
-		home, _ := os.UserHomeDir()
-		dir = home + "/.goclaw/data"
+		dir = config.ExpandHome(config.DesktopDataDir)
 	}
-	return dir
+	return config.ExpandHome(dir)
 }
 
 // startGateway launches the embedded gateway in a background goroutine.
@@ -291,8 +359,7 @@ func (a *App) startGateway() {
 // The gateway holds the DB open and cancelGw sends SIGINT to the process,
 // so we delete first, then restart the app cleanly.
 func (a *App) ResetDatabase() error {
-	dataDir := a.GetDataDir()
-	dbPath := filepath.Join(dataDir, "goclaw.db")
+	dbPath := desktopActiveSQLitePath(a.GetDataDir())
 
 	// Delete DB + WAL/SHM (works on Unix even while file is open).
 	for _, suffix := range []string{"", "-wal", "-shm"} {
@@ -304,6 +371,17 @@ func (a *App) ResetDatabase() error {
 	slog.Info("database reset: files deleted, restarting app", "path", dbPath)
 
 	return a.RestartApp()
+}
+
+func desktopSQLitePath(dataDir string) string {
+	return filepath.Join(dataDir, config.DesktopSQLiteDBFilename)
+}
+
+func desktopActiveSQLitePath(dataDir string) string {
+	if path := os.Getenv("GOCLAW_SQLITE_PATH"); path != "" {
+		return config.ExpandHome(path)
+	}
+	return desktopSQLitePath(dataDir)
 }
 
 // DownloadURL fetches a URL with Bearer auth and opens a Save As dialog.

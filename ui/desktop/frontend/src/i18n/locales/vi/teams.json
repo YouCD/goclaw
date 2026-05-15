@@ -77,10 +77,13 @@
   "feature": "Tính năng",
   "edition": {
     "group": {
-      "limits": "Giới hạn",
+      "runtime": "Runtime",
       "core": "Tính năng chính",
       "standardOnly": "Nâng cao (Standard)"
     },
+    "database": "Database",
+    "deployment": "Deployment",
+    "users": "Users",
     "agents": "Agent",
     "teams": "Nhóm",
     "teamMembers": "Thành viên nhóm",
@@ -100,12 +103,12 @@
     "knowledgeGraph": "Đồ thị tri thức",
     "vectorSearch": "Tìm kiếm vector",
     "rbac": "Phân quyền",
-    "multiTenant": "Multi-Tenant",
+    "workspaceIsolation": "Cô lập workspace",
     "agentLinks": "Agent Links",
     "activityLogs": "Nhật ký hoạt động",
     "apiKeys": "API Keys",
     "poolProvider": "Pool Provider",
     "secureCli": "Secure CLI",
-    "tenantUsers": "Quản lý Tenant & Users"
+    "userManagement": "Quản lý Users"
   }
 }

@@ -30,7 +30,7 @@ export function SubagentsSection({ enabled, value, onToggle, onChange }: Subagen
             onChange={(e) => update({ maxConcurrent: Math.min(numOrUndef(e.target.value) ?? 2, 2) })}
             className="w-full bg-surface-tertiary border border-border rounded-lg px-3 py-2 text-base md:text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
           />
-          <p className="text-[10px] text-text-muted">Lite limit: 2</p>
+          <p className="text-[10px] text-text-muted">SQLite runtime cap: 2</p>
         </div>
         <div className="space-y-1">
           <label className="text-[11px] font-medium text-text-secondary">{t('configSections.subagents.maxSpawnDepth')}</label>
@@ -40,7 +40,7 @@ export function SubagentsSection({ enabled, value, onToggle, onChange }: Subagen
             disabled
             className="w-full bg-surface-tertiary border border-border rounded-lg px-3 py-2 text-base md:text-sm text-text-primary opacity-60"
           />
-          <p className="text-[10px] text-text-muted">Lite limit: 1</p>
+          <p className="text-[10px] text-text-muted">SQLite runtime cap: 1</p>
         </div>
       </div>
 

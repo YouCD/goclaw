@@ -3,7 +3,7 @@ package store
 import "context"
 
 // ConfigSecretsStore manages encrypted config secrets.
-// Used for non-LLM/non-channel secrets: gateway token, TTS keys, Brave API key, etc.
+// Used for config-backed secrets that must be encrypted instead of persisted in config.json.
 type ConfigSecretsStore interface {
 	Get(ctx context.Context, key string) (string, error)
 	Set(ctx context.Context, key, value string) error

@@ -270,9 +270,17 @@ func matchesAnyPathExemption(word string, exemptions []string, baseDir string) b
 		if err != nil {
 			continue
 		}
+		if baseDir != "" {
+			if realBaseDir, err := canonicalizeExecPath(baseDir, baseDir); err == nil && isInternalWorkspacePath(realCandidate, realBaseDir) {
+				continue
+			}
+		}
 		for _, exemption := range exemptions {
 			realExemption, err := canonicalizeExecPath(exemption, baseDir)
 			if err != nil {
+				continue
+			}
+			if isInternalWorkspacePath(realCandidate, realExemption) {
 				continue
 			}
 			if matchesPathExemption(realCandidate, []string{realExemption}) {
@@ -281,4 +289,19 @@ func matchesAnyPathExemption(word string, exemptions []string, baseDir string) b
 		}
 	}
 	return false
+}
+
+func isInternalWorkspacePath(candidate, exemption string) bool {
+	hiddenRoot := filepath.Join(exemption, ".goclaw")
+	if candidate == hiddenRoot || strings.HasPrefix(candidate, hiddenRoot+string(filepath.Separator)) {
+		skillsRoot := filepath.Join(hiddenRoot, "skills-store")
+		return candidate != skillsRoot && !strings.HasPrefix(candidate, skillsRoot+string(filepath.Separator))
+	}
+	for _, name := range []string{"config.json", "memory.db", "memory.db-wal", "memory.db-shm"} {
+		if candidate == filepath.Join(exemption, name) {
+			return true
+		}
+	}
+	delegateRoot := filepath.Join(exemption, "delegate")
+	return candidate == delegateRoot || strings.HasPrefix(candidate, delegateRoot+string(filepath.Separator))
 }

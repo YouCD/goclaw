@@ -16,22 +16,38 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-goclaw}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goclaw}
-      POSTGRES_DB: ${POSTGRES_DB:-goclaw}
+      POSTGRES_DB: ${POSTGRES_DB:-goclaw_v4}
     volumes:
       - postgres-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-goclaw} -d ${POSTGRES_DB:-goclaw}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-goclaw} -d postgres"]
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
 
-  goclaw:
+  postgres-init:
+    image: pgvector/pgvector:pg18
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - GOCLAW_POSTGRES_DSN=postgres://${POSTGRES_USER:-goclaw}:${POSTGRES_PASSWORD:-goclaw}@postgres:5432/${POSTGRES_DB:-goclaw}?sslmode=disable
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-goclaw}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-goclaw}
+      POSTGRES_DB: ${POSTGRES_DB:-goclaw_v4}
+    command: >
+      sh -c 'case "$$POSTGRES_DB" in *[!A-Za-z0-9_]*|"") echo "invalid POSTGRES_DB"; exit 1;; esac;
+      createdb -d postgres "$$POSTGRES_DB" 2>/dev/null || true;
+      psql -d "$$POSTGRES_DB" -c "SELECT 1" >/dev/null'
+    restart: "no"
+
+  goclaw:
+    depends_on:
+      postgres-init:
+        condition: service_completed_successfully
+    environment:
+      - GOCLAW_POSTGRES_DSN=postgres://${POSTGRES_USER:-goclaw}:${POSTGRES_PASSWORD:-goclaw}@postgres:5432/${POSTGRES_DB:-goclaw_v4}?sslmode=disable
     volumes:
       - goclaw-skills:/app/skills
       - goclaw-workspace:/app/.goclaw

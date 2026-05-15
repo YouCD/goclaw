@@ -16,10 +16,10 @@ import (
 // Default returns a Config with sensible defaults.
 func Default() *Config {
 	return &Config{
-		DataDir: "~/.goclaw/data",
+		DataDir: DefaultDataDir,
 		Agents: AgentsConfig{
 			Defaults: AgentDefaults{
-				Workspace:           "~/.goclaw/workspace",
+				Workspace:           DefaultWorkspaceDir,
 				RestrictToWorkspace: true,
 				Provider:            "anthropic",
 				Model:               "claude-sonnet-4-5-20250929",
@@ -41,7 +41,7 @@ func Default() *Config {
 		},
 		Gateway: GatewayConfig{
 			Host:            "0.0.0.0",
-			Port:            18790,
+			Port:            DefaultGatewayPort,
 			MaxMessageChars: DefaultMaxMessageChars,
 			RateLimitRPM:    20,
 		},
@@ -277,7 +277,6 @@ func (c *Config) applyEnvOverrides() {
 	}
 }
 
-
 // Save writes the config to a JSON file.
 func Save(path string, cfg *Config) error {
 	cfg.mu.RLock()
@@ -318,7 +317,7 @@ func ResolvedDataDirFromEnv() string {
 	if v := os.Getenv("GOCLAW_DATA_DIR"); v != "" {
 		return ExpandHome(v)
 	}
-	return ExpandHome("~/.goclaw/data")
+	return ExpandHome(DefaultDataDir)
 }
 
 // WorkspacePath returns the expanded workspace path.

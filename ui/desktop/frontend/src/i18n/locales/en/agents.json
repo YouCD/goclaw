@@ -134,6 +134,27 @@
       "title": "Pinned Skills",
       "addPlaceholder": "Add a skill...",
       "hint": "Pinned skills are always inlined in the system prompt. Others use skill_search."
+    },
+    "configShell": {
+      "identityModel": "Identity & Model",
+      "identityModelDesc": "Name, status, provider, model, and budget limits.",
+      "reasoningPrompt": "Reasoning & Prompt",
+      "reasoningPromptDesc": "System prompt mode and extended thinking overrides.",
+      "memoryContext": "Memory & Context",
+      "memoryContextDesc": "Long-term memory, context pruning, and compaction.",
+      "toolsSandbox": "Tools & Sandbox",
+      "toolsSandboxDesc": "Subagent limits, tool policy, and execution isolation.",
+      "skillsMcp": "Skills & MCP",
+      "skillsMcpDesc": "Pinned skills, granted skills, and MCP server access.",
+      "voice": "Voice / TTS",
+      "voiceDesc": "Per-agent voice and fine-tune overrides.",
+      "evolution": "Evolution",
+      "evolutionDesc": "Self-evolution settings, metrics, suggestions, and guardrails.",
+      "files": "Files",
+      "filesDesc": "Agent context files and regeneration tools.",
+      "unsaved": "Unsaved",
+      "unsavedHint": "Unsaved changes in this agent config.",
+      "noChanges": "No pending changes."
     }
   },
   "general": {

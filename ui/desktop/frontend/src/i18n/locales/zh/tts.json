@@ -222,7 +222,7 @@
   "voice_loading": "加载声音中…",
   "voice_preview_error": "试听失败 — 正在刷新",
   "model_label": "模型",
-  "model_placeholder": "默认（租户/系统）",
+  "model_placeholder": "默认（系统）",
   "empty_state": {
     "title": "AI 语音尚未配置",
     "description": "配置 TTS 让智能体以语音回复",

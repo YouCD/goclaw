@@ -77,10 +77,13 @@
   "feature": "功能",
   "edition": {
     "group": {
-      "limits": "限制",
+      "runtime": "Runtime",
       "core": "核心功能",
       "standardOnly": "高级 (Standard)"
     },
+    "database": "Database",
+    "deployment": "Deployment",
+    "users": "Users",
     "agents": "代理",
     "teams": "团队",
     "teamMembers": "团队成员",
@@ -100,12 +103,12 @@
     "knowledgeGraph": "知识图谱",
     "vectorSearch": "向量搜索",
     "rbac": "角色权限",
-    "multiTenant": "多租户",
+    "workspaceIsolation": "工作区隔离",
     "agentLinks": "代理链接",
     "activityLogs": "活动日志",
     "apiKeys": "API 密钥",
     "poolProvider": "Pool Provider",
     "secureCli": "安全 CLI",
-    "tenantUsers": "租户与用户管理"
+    "userManagement": "用户管理"
   }
 }

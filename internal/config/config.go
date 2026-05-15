@@ -93,7 +93,7 @@ type DatabaseConfig struct {
 	PostgresDSN    string `json:"-"` // from env GOCLAW_POSTGRES_DSN only
 	RedisDSN       string `json:"-"` // from env GOCLAW_REDIS_DSN only (optional, requires -tags redis)
 	StorageBackend string `json:"-"` // from env GOCLAW_STORAGE_BACKEND only ("postgres" or "sqlite", default "postgres")
-	SQLitePath     string `json:"-"` // from env GOCLAW_SQLITE_PATH only (default: {dataDir}/goclaw.db)
+	SQLitePath     string `json:"-"` // from env GOCLAW_SQLITE_PATH only (default: {dataDir}/goclaw.db; desktop: goclaw-v4.db)
 }
 
 // SkillsConfig configures the skills storage system.
@@ -441,6 +441,7 @@ func (c *Config) ReplaceFrom(src *Config) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.DataDir = src.DataDir
+	c.WebURL = src.WebURL
 	c.Agents = src.Agents
 	c.Channels = src.Channels
 	c.Providers = src.Providers
@@ -449,10 +450,12 @@ func (c *Config) ReplaceFrom(src *Config) {
 	c.Sessions = src.Sessions
 	c.Database = src.Database
 	c.Tts = src.Tts
+	c.Audio = src.Audio
 	c.Cron = src.Cron
 	c.Telemetry = src.Telemetry
 	c.Tailscale = src.Tailscale
 	c.Bindings = src.Bindings
+	c.Hooks = src.Hooks
 }
 
 // IdentityConfig defines agent persona / display identity.

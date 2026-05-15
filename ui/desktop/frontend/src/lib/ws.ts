@@ -10,10 +10,18 @@ import {
 
 export type { FrameType, RequestFrame, ResponseFrame, EventFrame, Frame, EventHandler } from './ws-types'
 
+type RefreshHandler = () => Promise<{ accessToken: string } | null>
+type QueuedCall = {
+  run: () => void
+  reject: (err: Error) => void
+  timer: ReturnType<typeof setTimeout>
+}
+
 export class WsClient {
   private ws: WebSocket | null = null
   private url: string
-  private token: string
+  private gatewayToken: string
+  private accessToken: string
   private connected = false
   private connecting = false
   private pendingRequests = new Map<string, PendingRequest>()
@@ -22,12 +30,24 @@ export class WsClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private connectionChangeHandler?: (connected: boolean) => void
   private closed = false
-  private queuedCalls: Array<() => void> = []
+  private queuedCalls: QueuedCall[] = []
   private connectRequestId: string | null = null
+  private refreshHandler?: RefreshHandler
+  private refreshPromise: Promise<{ accessToken: string } | null> | null = null
+  private connectRetriedAfterRefresh = false
 
-  constructor(url: string, token: string) {
+  constructor(url: string, gatewayToken: string, accessToken = '') {
     this.url = url
-    this.token = token
+    this.gatewayToken = gatewayToken
+    this.accessToken = accessToken
+  }
+
+  setAccessToken(accessToken: string): void {
+    this.accessToken = accessToken
+  }
+
+  setRefreshHandler(handler: RefreshHandler): void {
+    this.refreshHandler = handler
   }
 
   connect(): void {
@@ -51,8 +71,9 @@ export class WsClient {
       id,
       method: 'connect',
       params: {
-        token: this.token,
-        user_id: 'system',
+        token: this.accessToken ? '' : this.gatewayToken,
+        accessToken: this.accessToken || undefined,
+        user_id: this.accessToken ? undefined : 'system',
         sender_id: 'desktop',
         locale: localStorage.getItem('goclaw:language') || navigator.language.split('-')[0] || 'en',
         protocol_version: 3,
@@ -82,7 +103,7 @@ export class WsClient {
       if (frame.ok) {
         this.onSessionConnected()
       } else {
-        console.error('[ws] connect handshake failed', frame.error)
+        void this.handleConnectFailure(frame)
       }
       return
     }
@@ -117,11 +138,15 @@ export class WsClient {
   private onSessionConnected(): void {
     console.info('[ws] session connected')
     this.connected = true
+    this.connectRetriedAfterRefresh = false
     this.reconnectDelay = RECONNECT_BASE_MS
     this.connectionChangeHandler?.(true)
 
     const queued = this.queuedCalls.splice(0)
-    for (const fn of queued) fn()
+    for (const item of queued) {
+      clearTimeout(item.timer)
+      item.run()
+    }
   }
 
   private handleClose(e: CloseEvent): void {
@@ -144,14 +169,73 @@ export class WsClient {
     }
   }
 
+  private async handleConnectFailure(frame: ResponseFrame): Promise<void> {
+    console.error('[ws] connect handshake failed', frame.error)
+
+    if (this.accessToken && this.refreshHandler && !this.connectRetriedAfterRefresh) {
+      this.connectRetriedAfterRefresh = true
+      const refreshed = await this.refreshAccessToken()
+      if (refreshed?.accessToken) {
+        this.accessToken = refreshed.accessToken
+        if (this.ws) {
+          this.ws.onclose = null
+          this.ws.close()
+        }
+        this.connecting = false
+        this.connected = false
+        this.ws = null
+        this.connect()
+        return
+      }
+    }
+
+    this.rejectQueuedCalls(new Error(frame.error?.message ?? 'WebSocket authentication failed'))
+    this.close()
+  }
+
+  private refreshAccessToken(): Promise<{ accessToken: string } | null> {
+    if (!this.refreshHandler) return Promise.resolve(null)
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.refreshHandler().finally(() => {
+        this.refreshPromise = null
+      })
+    }
+    return this.refreshPromise
+  }
+
+  private rejectQueuedCalls(err: Error): void {
+    const queued = this.queuedCalls.splice(0)
+    for (const item of queued) {
+      clearTimeout(item.timer)
+      item.reject(err)
+    }
+    for (const [, pending] of this.pendingRequests) {
+      clearTimeout(pending.timer)
+      pending.reject(err)
+    }
+    this.pendingRequests.clear()
+  }
+
   call(method: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
     const timeout = timeoutMs ?? (method === 'chat.send' ? CHAT_SEND_TIMEOUT_MS : DEFAULT_TIMEOUT_MS)
 
     if (!this.connected) {
       return new Promise((resolve, reject) => {
-        this.queuedCalls.push(() => {
-          this.call(method, params, timeoutMs).then(resolve, reject)
-        })
+        const queued: QueuedCall = {
+          run: () => {
+            this.queuedCalls = this.queuedCalls.filter((item) => item !== queued)
+            this.call(method, params, timeoutMs).then(resolve, reject)
+          },
+          reject,
+          timer: setTimeout(() => {
+            this.queuedCalls = this.queuedCalls.filter((item) => item !== queued)
+            reject(new Error(`RPC timeout: ${method}`))
+          }, timeout),
+        }
+        this.queuedCalls.push(queued)
+        if (!this.connecting && !this.closed) {
+          this.connect()
+        }
       })
     }
 
@@ -229,9 +313,9 @@ export function getWsClient(): WsClient {
   return client
 }
 
-export function initWsClient(url: string, token: string): WsClient {
+export function initWsClient(url: string, gatewayToken: string, accessToken = ''): WsClient {
   if (client) client.close()
-  client = new WsClient(url, token)
+  client = new WsClient(url, gatewayToken, accessToken)
   client.connect()
   return client
 }

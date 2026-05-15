@@ -202,6 +202,9 @@ func TestReplaceFrom(t *testing.T) {
 	src := Default()
 	src.Gateway.Port = 12345
 	src.DataDir = "/custom/data"
+	src.WebURL = "https://example.local"
+	src.Audio = &AudioConfig{Stt: &AudioSTTConfig{APIKey: "audio-secret"}}
+	src.Hooks.ScriptConcurrency = 7
 
 	dst.ReplaceFrom(src)
 
@@ -210,6 +213,15 @@ func TestReplaceFrom(t *testing.T) {
 	}
 	if dst.DataDir != "/custom/data" {
 		t.Errorf("ReplaceFrom should copy DataDir, got %q", dst.DataDir)
+	}
+	if dst.WebURL != "https://example.local" {
+		t.Errorf("ReplaceFrom should copy WebURL, got %q", dst.WebURL)
+	}
+	if dst.Audio == nil || dst.Audio.Stt == nil || dst.Audio.Stt.APIKey != "audio-secret" {
+		t.Fatalf("ReplaceFrom should copy Audio, got %#v", dst.Audio)
+	}
+	if dst.Hooks.ScriptConcurrency != 7 {
+		t.Errorf("ReplaceFrom should copy Hooks, got %d", dst.Hooks.ScriptConcurrency)
 	}
 }
 
@@ -271,10 +283,10 @@ func TestCronConfig_ToRetryConfig_Custom(t *testing.T) {
 func TestApplySystemConfigs(t *testing.T) {
 	cfg := Default()
 	cfg.ApplySystemConfigs(map[string]string{
-		"agent.default_provider":   "openai",
-		"agent.default_model":      "gpt-4o",
-		"agent.context_window":     "100000",
-		"gateway.rate_limit_rpm":   "60",
+		"agent.default_provider":    "openai",
+		"agent.default_model":       "gpt-4o",
+		"agent.context_window":      "100000",
+		"gateway.rate_limit_rpm":    "60",
 		"gateway.max_message_chars": "50000",
 	})
 

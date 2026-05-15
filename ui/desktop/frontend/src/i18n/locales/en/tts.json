@@ -222,7 +222,7 @@
   "voice_loading": "Loading voices…",
   "voice_preview_error": "Preview failed — refreshing list",
   "model_label": "Model",
-  "model_placeholder": "Default (tenant/system)",
+  "model_placeholder": "Default (system)",
   "empty_state": {
     "title": "AI voice is not configured",
     "description": "Configure TTS so agents can reply with audio.",

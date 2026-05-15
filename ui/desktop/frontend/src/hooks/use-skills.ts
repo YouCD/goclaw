@@ -3,8 +3,6 @@ import { getApiClient, isApiClientReady } from '../lib/api'
 import { toast } from '../stores/toast-store'
 import type { SkillInfo } from '../types/skill'
 
-export const MAX_SKILLS_LITE = 10
-
 export interface RuntimeInfo {
   name: string
   available: boolean
@@ -80,7 +78,5 @@ export function useSkills() {
     }
   }, [])
 
-  const atLimit = skills.length >= MAX_SKILLS_LITE
-
-  return { skills, loading, atLimit, fetchSkills, toggleSkill, uploadSkill, checkRuntimes, deleteSkill }
+  return { skills, loading, fetchSkills, toggleSkill, uploadSkill, checkRuntimes, deleteSkill }
 }

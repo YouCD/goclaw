@@ -5,7 +5,7 @@ import type { AgentData } from '../types/agent'
 
 export type SetupStep = 1 | 2 | 3 | 'complete'
 
-// Desktop is single-tenant — any provider counts as configured
+// Desktop is local-only; any provider counts as configured.
 function isConfigured(p: ProviderData): boolean {
   return p.enabled
 }

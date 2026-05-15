@@ -87,6 +87,14 @@ func GenerateBootstrapToken() (string, error) {
 	return tok, nil
 }
 
+// CurrentBootstrapToken returns the in-process bootstrap token for trusted
+// desktop IPC callers. It is never persisted and is cleared after bootstrap.
+func CurrentBootstrapToken() string {
+	bootstrapTokenMu.RLock()
+	defer bootstrapTokenMu.RUnlock()
+	return bootstrapToken
+}
+
 // clearBootstrapToken wipes the in-memory token after a successful bootstrap.
 func clearBootstrapToken() {
 	bootstrapTokenMu.Lock()

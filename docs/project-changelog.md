@@ -4,6 +4,20 @@ Significant changes, features, and fixes in reverse chronological order.
 
 ---
 
+## 2026-05-15 — Desktop App v4 Redesign
+
+Desktop Lite v4 runtime and UI redesign passed final verification through Phase 08.
+
+- **Runtime isolation:** desktop now defaults to `127.0.0.1:18791`, `~/.goclaw/v4`, `goclaw-v4.db`, and `lite-v4-*` release tags. Existing v3 data under `~/.goclaw/data` is preserved, not imported.
+- **Bootstrap/auth:** first-run local admin flow, login/refresh handling, and OS keyring-backed token storage.
+- **Settings redesign:** grouped settings sidebar with General, Credentials, Backup/Restore, Projects, Approvals, Pending Messages, MCP, Storage, Traces, and About. Channels remain hidden in desktop v4 visible navigation.
+- **Agent config redesign:** cleaner agent detail/config surfaces with focused tests.
+- **MCP hardening:** scope-aware create form, create-only team/project scope payloads, edit-safe headers/env preservation, and post-create Manage grants flow to avoid implicit all-tools grants.
+- **Final sweep:** removed stale desktop-visible tenant, quota, and channel copy; STT proxy `tenant_id` stays because it is an upstream provider contract.
+- **Verification:** desktop frontend tests/build, Go PG/sqliteonly builds, and Wails sqliteonly package build passed.
+
+---
+
 ## 2026-05-06 — v4 RC1 Phase B: Channel Chat Support
 
 **All 11 phases complete.** Channel identity merge atomicity, workspace path resolution, and sub-agent isolation landed.

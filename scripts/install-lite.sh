@@ -3,7 +3,7 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/nextlevelbuilder/goclaw/main/scripts/install-lite.sh | bash
-#   curl -fsSL ... | bash -s -- --version lite-v0.1.0
+#   curl -fsSL ... | bash -s -- --version lite-v4-0.1.0
 #
 # macOS only. Windows users: download .zip from GitHub Releases.
 
@@ -18,7 +18,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --version) VERSION="$2"; shift 2 ;;
     --help|-h)
-      echo "Usage: install-lite.sh [--version lite-v1.0.0]"
+      echo "Usage: install-lite.sh [--version lite-v4-1.0.0]"
       echo "  Downloads and installs GoClaw Lite desktop app to /Applications/"
       exit 0
       ;;
@@ -47,9 +47,10 @@ fi
 if [[ -z "$VERSION" ]]; then
   echo "→ Fetching latest desktop release..."
   VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=100" \
-    | grep '"tag_name": "lite-v' \
+    | grep '"tag_name": "lite-v4-' \
+    | grep -Ev '(-beta|-rc)' \
     | head -1 \
-    | sed 's/.*"tag_name": "\(lite-v[^"]*\)".*/\1/' || true)
+    | sed 's/.*"tag_name": "\(lite-v4-[^"]*\)".*/\1/' || true)
 
   if [[ -z "$VERSION" ]]; then
     echo "❌ No desktop release found. Check https://github.com/$REPO/releases"
@@ -57,7 +58,7 @@ if [[ -z "$VERSION" ]]; then
   fi
 fi
 
-SEMVER="${VERSION#lite-v}"
+SEMVER="${VERSION#lite-v4-}"
 echo "→ Installing GoClaw Lite v${SEMVER} (${ARCH})..."
 
 # ── Download ──

@@ -1,6 +1,8 @@
 package http
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -8,6 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/nextlevelbuilder/goclaw/internal/backup"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
@@ -18,6 +24,18 @@ import (
 )
 
 const maxRestoreSize = 10 << 30 // 10 GB
+const restoreDryRunTTL = 10 * time.Minute
+
+var restoreDryRunProofs = struct {
+	sync.Mutex
+	items map[string]restoreDryRunProof
+}{items: make(map[string]restoreDryRunProof)}
+
+type restoreDryRunProof struct {
+	UserID    string
+	Digest    string
+	ExpiresAt time.Time
+}
 
 // RestoreHandler handles the POST /v1/system/restore endpoint.
 type RestoreHandler struct {
@@ -43,7 +61,8 @@ func (h *RestoreHandler) handleRestore(w http.ResponseWriter, r *http.Request) {
 	userID := store.UserIDFromContext(r.Context())
 	locale := extractLocale(r)
 
-	if !h.isOwnerUser(userID) {
+	// Root role (DB-level super-admin) has the same privileges as a configured owner.
+	if !h.isOwnerUser(userID) && !store.IsRootRole(r.Context()) {
 		slog.Warn("security.restore_owner_denied", "user_id", userID)
 		writeError(w, http.StatusForbidden, protocol.ErrUnauthorized,
 			i18n.T(locale, i18n.MsgNoAccess, "system restore"))
@@ -106,7 +125,7 @@ func (h *RestoreHandler) handleRestore(w http.ResponseWriter, r *http.Request) {
 	tmpPath := tmp.Name()
 	defer os.Remove(tmpPath)
 
-	written, err := copyWithLimit(tmp, file, maxRestoreSize)
+	written, digest, err := copyWithLimit(tmp, file, maxRestoreSize)
 	tmp.Close()
 	if err != nil {
 		writeError(w, http.StatusBadRequest, protocol.ErrInvalidRequest,
@@ -115,6 +134,10 @@ func (h *RestoreHandler) handleRestore(w http.ResponseWriter, r *http.Request) {
 	}
 	if written == 0 {
 		writeError(w, http.StatusBadRequest, protocol.ErrInvalidRequest, "archive is empty")
+		return
+	}
+	if !dryRun && !consumeRestoreDryRunProof(userID, digest, q.Get("dry_run_token")) {
+		writeError(w, http.StatusBadRequest, protocol.ErrInvalidRequest, "successful dry-run token required before restore")
 		return
 	}
 
@@ -150,7 +173,7 @@ func (h *RestoreHandler) handleRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendSSE(w, flusher, "complete", map[string]any{
+	payload := map[string]any{
 		"manifest_version":  result.ManifestVersion,
 		"schema_version":    result.SchemaVersion,
 		"database_restored": result.DatabaseRestored,
@@ -158,7 +181,11 @@ func (h *RestoreHandler) handleRestore(w http.ResponseWriter, r *http.Request) {
 		"bytes_extracted":   result.BytesExtracted,
 		"warnings":          result.Warnings,
 		"dry_run":           dryRun,
-	})
+	}
+	if dryRun {
+		payload["dry_run_token"] = storeRestoreDryRunProof(userID, digest)
+	}
+	sendSSE(w, flusher, "complete", payload)
 }
 
 // isOwnerUser returns true if userID belongs to a configured system owner.
@@ -175,15 +202,16 @@ func checkPsqlAvailable() error {
 
 // copyWithLimit copies at most limit bytes from src to dst.
 // Returns an error if the source exceeds limit.
-func copyWithLimit(dst io.Writer, src io.Reader, limit int64) (int64, error) {
-	n, err := io.Copy(dst, io.LimitReader(src, limit+1))
+func copyWithLimit(dst io.Writer, src io.Reader, limit int64) (int64, string, error) {
+	hash := sha256.New()
+	n, err := io.Copy(io.MultiWriter(dst, hash), io.LimitReader(src, limit+1))
 	if err != nil {
-		return n, err
+		return n, "", err
 	}
 	if n > limit {
-		return n, fmt.Errorf("upload exceeds %s limit", formatBytes(limit))
+		return n, "", fmt.Errorf("upload exceeds %s limit", formatBytes(limit))
 	}
-	return n, nil
+	return n, hex.EncodeToString(hash.Sum(nil)), nil
 }
 
 // formatBytes formats a byte count as a human-readable string.
@@ -192,4 +220,37 @@ func formatBytes(b int64) string {
 		return strconv.FormatInt(b>>30, 10) + " GB"
 	}
 	return strconv.FormatInt(b>>20, 10) + " MB"
+}
+
+func storeRestoreDryRunProof(userID, digest string) string {
+	token := uuid.Must(uuid.NewV7()).String()
+	now := time.Now()
+	restoreDryRunProofs.Lock()
+	for key, proof := range restoreDryRunProofs.items {
+		if now.After(proof.ExpiresAt) {
+			delete(restoreDryRunProofs.items, key)
+		}
+	}
+	restoreDryRunProofs.items[token] = restoreDryRunProof{
+		UserID:    userID,
+		Digest:    digest,
+		ExpiresAt: now.Add(restoreDryRunTTL),
+	}
+	restoreDryRunProofs.Unlock()
+	return token
+}
+
+func consumeRestoreDryRunProof(userID, digest, token string) bool {
+	if token == "" {
+		return false
+	}
+	now := time.Now()
+	restoreDryRunProofs.Lock()
+	defer restoreDryRunProofs.Unlock()
+	proof, ok := restoreDryRunProofs.items[token]
+	if !ok {
+		return false
+	}
+	delete(restoreDryRunProofs.items, token)
+	return !now.After(proof.ExpiresAt) && proof.UserID == userID && proof.Digest == digest
 }

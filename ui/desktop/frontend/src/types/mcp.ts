@@ -1,3 +1,5 @@
+export type McpScope = 'global' | 'team' | 'project'
+
 export interface MCPServerData {
   id: string
   name: string
@@ -14,6 +16,9 @@ export interface MCPServerData {
   enabled: boolean
   created_by: string
   agent_count?: number
+  team_id?: string | null
+  project_id?: string | null
+  scope?: McpScope
   created_at: string
   updated_at: string
 }
@@ -29,7 +34,10 @@ export interface MCPServerInput {
   env?: Record<string, string>
   tool_prefix?: string
   timeout_sec?: number
+  settings?: { require_user_credentials?: boolean }
   enabled?: boolean
+  team_id?: string | null
+  project_id?: string | null
 }
 
 export interface MCPAgentGrant {

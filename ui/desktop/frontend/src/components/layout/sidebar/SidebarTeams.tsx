@@ -6,8 +6,6 @@ import { teamService } from '../../../services/team-service'
 import { TeamCreateDialog } from '../../teams/TeamCreateDialog'
 import type { TeamData } from '../../../types/team'
 
-const MAX_TEAMS_LITE = 1
-
 export function SidebarTeams() {
   const { t } = useTranslation('teams')
   const [teams, setTeams] = useState<TeamData[]>([])
@@ -23,20 +21,17 @@ export function SidebarTeams() {
     }).catch(() => {})
   }, [])
 
-  const atLimit = teams.length >= MAX_TEAMS_LITE
-
   return (
     <div className="px-3 py-2 space-y-1">
       {/* Section header + add button */}
       <div className="flex items-center justify-between px-1">
         <span className="text-[10px] text-text-muted font-medium tracking-wide">
-          {t('title', 'Teams')} ({teams.length}/{MAX_TEAMS_LITE})
+          {t('title', 'Teams')} ({teams.length})
         </span>
         <button
           onClick={() => setCreateOpen(true)}
-          disabled={atLimit}
-          className="w-5 h-5 flex items-center justify-center rounded text-text-muted hover:text-accent hover:bg-surface-tertiary transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-          title={atLimit ? t('limitReached', 'Team limit reached') : t('createTeam', 'New team')}
+          className="w-5 h-5 flex items-center justify-center rounded text-text-muted hover:text-accent hover:bg-surface-tertiary transition-colors cursor-pointer"
+          title={t('createTeam', 'New team')}
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />

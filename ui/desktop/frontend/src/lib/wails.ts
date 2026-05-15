@@ -9,6 +9,11 @@ export interface UpdateInfo {
   release_notes: string
 }
 
+export interface AuthTokens {
+  accessToken: string
+  refreshToken: string
+}
+
 declare global {
   interface Window {
     go: {
@@ -16,6 +21,10 @@ declare global {
         App: {
           GetGatewayURL(): Promise<string>
           GetGatewayToken(): Promise<string>
+          GetBootstrapToken(): Promise<string>
+          GetAuthTokens(): Promise<AuthTokens>
+          SaveAuthTokens(accessToken: string, refreshToken: string): Promise<void>
+          ClearAuthTokens(): Promise<void>
           GetGatewayPort(): Promise<number>
           IsGatewayReady(): Promise<boolean>
           GetVersion(): Promise<string>
@@ -36,6 +45,11 @@ declare global {
 export const wails = {
   getGatewayURL: (): Promise<string> => window.go.main.App.GetGatewayURL(),
   getGatewayToken: (): Promise<string> => window.go.main.App.GetGatewayToken(),
+  getBootstrapToken: (): Promise<string> => window.go.main.App.GetBootstrapToken(),
+  getAuthTokens: (): Promise<AuthTokens> => window.go.main.App.GetAuthTokens(),
+  saveAuthTokens: (accessToken: string, refreshToken: string): Promise<void> =>
+    window.go.main.App.SaveAuthTokens(accessToken, refreshToken),
+  clearAuthTokens: (): Promise<void> => window.go.main.App.ClearAuthTokens(),
   getGatewayPort: (): Promise<number> => window.go.main.App.GetGatewayPort(),
   isGatewayReady: (): Promise<boolean> => window.go.main.App.IsGatewayReady(),
   getVersion: (): Promise<string> => window.go.main.App.GetVersion(),

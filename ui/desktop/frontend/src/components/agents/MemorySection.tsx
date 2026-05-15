@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { MemoryConfig } from '../../types/agent'
 
 interface MemorySectionProps {
@@ -18,6 +19,7 @@ const defaults: Required<MemoryConfig> = {
 }
 
 export function MemorySection({ config, onChange }: MemorySectionProps) {
+  const { t } = useTranslation('agents')
   const enabled = config?.enabled ?? false
 
   const update = (field: keyof MemoryConfig, value: unknown) => {
@@ -28,8 +30,8 @@ export function MemorySection({ config, onChange }: MemorySectionProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-text-primary">Memory</h3>
-          <p className="text-[11px] text-text-muted">Vector-based long-term memory for this agent</p>
+          <h3 className="text-sm font-semibold text-text-primary">{t('configSections.memory.title')}</h3>
+          <p className="text-[11px] text-text-muted">{t('configSections.memory.description')}</p>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
           <input
@@ -53,14 +55,14 @@ export function MemorySection({ config, onChange }: MemorySectionProps) {
           {/* Search results */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <NumberField
-              label="Max Results"
-              hint="Number of memory chunks to retrieve"
+              label={t('configSections.memory.maxResults')}
+              hint={t('configSections.memory.maxResultsTip')}
               value={config?.max_results ?? defaults.max_results}
               onChange={(v) => update('max_results', v)}
             />
             <NumberField
-              label="Min Score"
-              hint="Minimum relevance threshold (0-1)"
+              label={t('configSections.memory.minScore')}
+              hint={t('configSections.memory.minScoreTip')}
               value={config?.min_score ?? defaults.min_score}
               onChange={(v) => update('min_score', v)}
               step={0.05}
@@ -70,14 +72,14 @@ export function MemorySection({ config, onChange }: MemorySectionProps) {
           {/* Chunking */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <NumberField
-              label="Max Chunk Length"
-              hint="Characters per memory chunk"
+              label={t('configSections.memory.maxChunkLen')}
+              hint={t('configSections.memory.maxChunkLenTip')}
               value={config?.max_chunk_len ?? defaults.max_chunk_len}
               onChange={(v) => update('max_chunk_len', v)}
             />
             <NumberField
-              label="Chunk Overlap"
-              hint="Overlap between adjacent chunks"
+              label={t('configSections.memory.chunkOverlap')}
+              hint={t('configSections.memory.chunkOverlapTip')}
               value={config?.chunk_overlap ?? defaults.chunk_overlap}
               onChange={(v) => update('chunk_overlap', v)}
             />
@@ -86,15 +88,15 @@ export function MemorySection({ config, onChange }: MemorySectionProps) {
           {/* Weights */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <NumberField
-              label="Vector Weight"
-              hint="Semantic similarity weight (0-1)"
+              label={t('configSections.memory.vectorWeight')}
+              hint={t('configSections.memory.vectorWeightTip')}
               value={config?.vector_weight ?? defaults.vector_weight}
               onChange={(v) => update('vector_weight', v)}
               step={0.1}
             />
             <NumberField
-              label="Text Weight"
-              hint="Keyword match weight (0-1)"
+              label={t('configSections.memory.textWeight')}
+              hint={t('configSections.memory.textWeightTip')}
               value={config?.text_weight ?? defaults.text_weight}
               onChange={(v) => update('text_weight', v)}
               step={0.1}
@@ -104,7 +106,7 @@ export function MemorySection({ config, onChange }: MemorySectionProps) {
       )}
 
       {!enabled && (
-        <p className="text-[11px] text-text-muted italic">Using global defaults</p>
+        <p className="text-[11px] text-text-muted italic">{t('config.usingGlobalDefaults')}</p>
       )}
     </div>
   )

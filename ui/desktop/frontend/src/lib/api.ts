@@ -1,5 +1,7 @@
 // HTTP API client for GoClaw REST endpoints
 
+import type { AuthTokens } from './wails'
+
 class ApiError extends Error {
   constructor(
     message: string,
@@ -13,32 +15,87 @@ class ApiError extends Error {
 
 class ApiClient {
   private baseUrl: string
-  private token: string
+  private gatewayToken: string
+  private accessToken: string
+  private refreshHandler?: () => Promise<AuthTokens | null>
+  private refreshPromise: Promise<AuthTokens | null> | null = null
 
-  constructor(baseUrl: string, token: string) {
+  constructor(baseUrl: string, gatewayToken: string, accessToken = '') {
     this.baseUrl = baseUrl.replace(/\/$/, '')
-    this.token = token
+    this.gatewayToken = gatewayToken
+    this.accessToken = accessToken
   }
 
-  private headers(extra?: Record<string, string>): Record<string, string> {
+  setAuthTokens(tokens: Partial<AuthTokens>): void {
+    this.accessToken = tokens.accessToken ?? ''
+  }
+
+  setRefreshHandler(handler: () => Promise<AuthTokens | null>): void {
+    this.refreshHandler = handler
+  }
+
+  private bearerToken(): string {
+    return this.accessToken || this.gatewayToken
+  }
+
+  private headers(extra?: Record<string, string>, json = true): Record<string, string> {
     // Send locale for i18n error messages from backend
     const lang = typeof localStorage !== 'undefined' ? localStorage.getItem('goclaw:language') : null
-    return {
-      Authorization: `Bearer ${this.token}`,
-      'Content-Type': 'application/json',
-      'X-GoClaw-User-Id': 'system',
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.bearerToken()}`,
+      'X-Requested-With': 'XMLHttpRequest',
+      ...(json ? { 'Content-Type': 'application/json' } : {}),
       ...(lang ? { 'Accept-Language': lang } : {}),
       ...extra,
     }
+    if (!this.accessToken) headers['X-GoClaw-User-Id'] = 'system'
+    return headers
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const url = `${this.baseUrl}${path}`
+  private async refreshOnce(retried: boolean): Promise<boolean> {
+    if (retried) return false
+    const refreshed = await this.refreshAuth()
+    return !!refreshed?.accessToken
+  }
+
+  async refreshAuth(): Promise<AuthTokens | null> {
+    if (!this.accessToken || !this.refreshHandler) return null
+
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.refreshHandler().finally(() => {
+        this.refreshPromise = null
+      })
+    }
+
+    const refreshed = await this.refreshPromise
+    if (!refreshed?.accessToken) return null
+    this.setAuthTokens(refreshed)
+    return refreshed
+  }
+
+  private async fetchWithAuth(
+    url: string,
+    init: RequestInit,
+    json = true,
+    retried = false,
+  ): Promise<Response> {
     const res = await fetch(url, {
-      method,
-      headers: this.headers(),
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      ...init,
+      headers: this.headers(init.headers as Record<string, string> | undefined, json),
     })
+
+    if (res.status === 401 && await this.refreshOnce(retried)) {
+      return this.fetchWithAuth(url, init, json, true)
+    }
+    return res
+  }
+
+  private async request<T>(method: string, path: string, body?: unknown, retried = false): Promise<T> {
+    const url = `${this.baseUrl}${path}`
+    const res = await this.fetchWithAuth(url, {
+      method,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }, true, retried)
 
     if (!res.ok) {
       let code: string | undefined
@@ -94,9 +151,7 @@ class ApiClient {
   /** Fetch a file with Bearer auth. Use for URLs without ?ft= token (e.g. media_refs). */
   async fetchFile(url: string): Promise<Response> {
     const fullUrl = url.startsWith('http') ? url : `${this.baseUrl}${url}`
-    return fetch(fullUrl, {
-      headers: { Authorization: `Bearer ${this.token}` },
-    })
+    return this.fetchWithAuth(fullUrl, {}, false)
   }
 
   /** Sign a file path, returning a URL with ?ft= token for unauthenticated access. */
@@ -109,9 +164,7 @@ class ApiClient {
   async fetchBlob(path: string, params?: Record<string, string>): Promise<Blob> {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
     const url = `${this.baseUrl}${path}${qs}`
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${this.token}` },
-    })
+    const res = await this.fetchWithAuth(url, {}, false)
     if (!res.ok) throw new ApiError(res.statusText, res.status)
     return res.blob()
   }
@@ -119,21 +172,37 @@ class ApiClient {
   /** Fetch an SSE stream with Bearer auth. Used for storage size streaming. */
   async streamFetch(path: string, signal?: AbortSignal): Promise<Response> {
     const url = `${this.baseUrl}${path}`
-    return fetch(url, {
-      headers: { Authorization: `Bearer ${this.token}` },
+    return this.fetchWithAuth(url, { signal }, false)
+  }
+
+  /** POST an SSE stream with a JSON body. Used for backup operations. */
+  async streamPost(path: string, body?: unknown, signal?: AbortSignal): Promise<Response> {
+    const url = `${this.baseUrl}${path}`
+    return this.fetchWithAuth(url, {
+      method: 'POST',
+      body: body !== undefined ? JSON.stringify(body) : undefined,
       signal,
-    })
+    }, true)
+  }
+
+  /** Upload a file and read an SSE stream response. Used for restore dry-run/restore. */
+  async uploadStream(path: string, field: string, file: File, params?: Record<string, string>, signal?: AbortSignal): Promise<Response> {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
+    const url = `${this.baseUrl}${path}${qs}`
+    const form = new FormData()
+    form.append(field, file)
+    return this.fetchWithAuth(url, {
+      method: 'POST',
+      body: form,
+      signal,
+    }, false)
   }
 
   /** Raw PUT request without JSON body (for query-param-only endpoints like /v1/storage/move). */
   async putRaw(path: string): Promise<void> {
     const url = `${this.baseUrl}${path}`
-    const res = await fetch(url, {
+    const res = await this.fetchWithAuth(url, {
       method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'X-GoClaw-User-Id': 'system',
-      },
     })
     if (!res.ok) {
       let message = res.statusText
@@ -150,14 +219,10 @@ class ApiClient {
     const form = new FormData()
     form.append('file', file)
 
-    const res = await fetch(url, {
+    const res = await this.fetchWithAuth(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        'X-GoClaw-User-Id': 'system',
-      },
       body: form,
-    })
+    }, false)
 
     if (!res.ok) {
       let message = res.statusText
@@ -184,8 +249,8 @@ export function isApiClientReady(): boolean {
   return apiClient !== null
 }
 
-export function initApiClient(baseUrl: string, token: string): ApiClient {
-  apiClient = new ApiClient(baseUrl, token)
+export function initApiClient(baseUrl: string, gatewayToken: string, accessToken = ''): ApiClient {
+  apiClient = new ApiClient(baseUrl, gatewayToken, accessToken)
   return apiClient
 }
 

@@ -88,19 +88,24 @@ irm https://raw.githubusercontent.com/nextlevelbuilder/goclaw/main/scripts/insta
 ```
 
 ### What's Included
-- Single native app (Wails v2 + React), ~30 MB
-- SQLite database (zero setup)
+- Single native app (Wails v2 + React)
+- SQLite database (zero setup) at `~/.goclaw/v4/goclaw-v4.db`
+- Local gateway on `127.0.0.1:18791` by default
+- First-run local admin setup with access/refresh tokens stored in the OS keyring
 - Chat with agents (streaming, tools, media, file attachments)
-- Agent management (max 5), provider config, MCP servers, skills, cron
+- Agent management, provider config, MCP servers, skills, cron, backups, and settings
 - Team tasks with Kanban board and real-time updates
 - Auto-update from GitHub Releases
+
+v4 desktop starts from a fresh data directory and preserves older `~/.goclaw/data`
+content in place. v3 desktop data is not imported automatically.
 
 ### Lite vs Standard
 
 | Feature | Lite (Desktop) | Standard (Server) |
 |---------|---------------|-------------------|
-| Agents | Max 5 | Unlimited |
-| Teams | Max 1 (5 members) | Unlimited |
+| Agents | Local technical cap | Unlimited |
+| Teams | Local technical cap | Unlimited |
 | Database | SQLite (local) | PostgreSQL |
 | Memory | FTS5 text search | pgvector semantic |
 | Channels | — | Telegram, Discord, Slack, Zalo, Feishu, WhatsApp |
@@ -117,9 +122,9 @@ make desktop-dev                      # Dev mode with hot reload
 ```
 
 ### Desktop Releases
-Desktop uses independent versioning with `lite-v*` tags:
+Desktop uses independent versioning with `lite-v4-*` tags:
 ```bash
-git tag lite-v0.1.0 && git push origin lite-v0.1.0
+git tag lite-v4-0.1.0 && git push origin lite-v4-0.1.0
 # → GitHub Actions builds macOS (.dmg + .tar.gz) + Windows (.zip)
 # → Creates GitHub Release with all assets
 ```

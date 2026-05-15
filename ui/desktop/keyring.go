@@ -5,22 +5,31 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 
+	"github.com/nextlevelbuilder/goclaw/internal/config"
 	"github.com/zalando/go-keyring"
 )
 
 const (
-	serviceName = "goclaw-desktop"
-	keyEncKey   = "encryption_key"
-	keyGwToken  = "gateway_token"
+	serviceName     = "goclaw-desktop-v4"
+	keyEncKey       = "encryption_key"
+	keyGwToken      = "gateway_token"
+	keyAccessToken  = "access_token"
+	keyRefreshToken = "refresh_token"
 )
 
+type AuthTokens struct {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+}
+
 // EnsureSecrets retrieves or generates the encryption key and gateway token.
-// Primary storage: OS keyring. Fallback: file-based storage in ~/.goclaw/secrets/.
+// Primary storage: OS keyring. Fallback: file-based storage in the v4 data dir.
 func EnsureSecrets() (encKey, gwToken string, err error) {
 	encKey, err = getOrCreateSecret(keyEncKey, 32)
 	if err != nil {
@@ -34,10 +43,15 @@ func EnsureSecrets() (encKey, gwToken string, err error) {
 }
 
 func getOrCreateSecret(key string, numBytes int) (string, error) {
+	var val string
+	var err error
+
 	// Try OS keyring first.
-	val, err := keyring.Get(serviceName, key)
-	if err == nil && val != "" {
-		return val, nil
+	if !keyringDisabled() {
+		val, err = keyring.Get(serviceName, key)
+		if err == nil && val != "" {
+			return val, nil
+		}
 	}
 
 	// Try file-based fallback.
@@ -50,14 +64,91 @@ func getOrCreateSecret(key string, numBytes int) (string, error) {
 	val = generateHex(numBytes)
 
 	// Persist to keyring; fall back to file if keyring unavailable.
-	if kerr := keyring.Set(serviceName, key, val); kerr != nil {
-		slog.Warn("keyring unavailable, using file fallback", "key", key, "error", kerr)
-		if ferr := writeSecretFile(key, val); ferr != nil {
-			return "", fmt.Errorf("failed to store secret: %w", ferr)
+	if !keyringDisabled() {
+		if kerr := keyring.Set(serviceName, key, val); kerr == nil {
+			return val, nil
+		} else {
+			slog.Warn("keyring unavailable, using file fallback", "key", key, "error", kerr)
 		}
+	}
+	if ferr := writeSecretFile(key, val); ferr != nil {
+		return "", fmt.Errorf("failed to store secret: %w", ferr)
 	}
 
 	return val, nil
+}
+
+func GetAuthTokens() (AuthTokens, error) {
+	access, err := readStoredSecret(keyAccessToken)
+	if err != nil {
+		return AuthTokens{}, fmt.Errorf("access token: %w", err)
+	}
+	refresh, err := readStoredSecret(keyRefreshToken)
+	if err != nil {
+		return AuthTokens{}, fmt.Errorf("refresh token: %w", err)
+	}
+	return AuthTokens{AccessToken: access, RefreshToken: refresh}, nil
+}
+
+func SaveAuthTokens(accessToken, refreshToken string) error {
+	if accessToken == "" || refreshToken == "" {
+		return fmt.Errorf("auth tokens must be non-empty")
+	}
+	if err := writeStoredSecret(keyAccessToken, accessToken); err != nil {
+		return fmt.Errorf("access token: %w", err)
+	}
+	if err := writeStoredSecret(keyRefreshToken, refreshToken); err != nil {
+		return fmt.Errorf("refresh token: %w", err)
+	}
+	return nil
+}
+
+func ClearAuthTokens() error {
+	var errs []error
+	for _, key := range []string{keyAccessToken, keyRefreshToken} {
+		if !keyringDisabled() {
+			if err := keyring.Delete(serviceName, key); err != nil && !errors.Is(err, keyring.ErrNotFound) {
+				errs = append(errs, fmt.Errorf("keyring %s: %w", key, err))
+			}
+		}
+		path := filepath.Join(secretsDir(), key)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			errs = append(errs, fmt.Errorf("file %s: %w", key, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func readStoredSecret(key string) (string, error) {
+	if !keyringDisabled() {
+		val, err := keyring.Get(serviceName, key)
+		if err == nil && val != "" {
+			return val, nil
+		}
+		if err != nil && !errors.Is(err, keyring.ErrNotFound) {
+			slog.Warn("keyring read failed, using file fallback", "key", key, "error", err)
+		}
+	}
+	val, err := readSecretFile(key)
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+	return val, err
+}
+
+func writeStoredSecret(key, value string) error {
+	if !keyringDisabled() {
+		if err := keyring.Set(serviceName, key, value); err == nil {
+			return nil
+		} else {
+			slog.Warn("keyring unavailable, using file fallback", "key", key, "error", err)
+		}
+	}
+	return writeSecretFile(key, value)
+}
+
+func keyringDisabled() bool {
+	return os.Getenv("GOCLAW_DISABLE_KEYRING") == "1"
 }
 
 func generateHex(numBytes int) string {
@@ -69,8 +160,16 @@ func generateHex(numBytes int) string {
 }
 
 func secretsDir() string {
-	home, _ := os.UserHomeDir()
-	dir := filepath.Join(home, ".goclaw", "secrets")
+	if dir := os.Getenv("GOCLAW_SECRETS_DIR"); dir != "" {
+		dir = config.ExpandHome(dir)
+		os.MkdirAll(dir, 0700)
+		return dir
+	}
+	dataDir := os.Getenv("GOCLAW_DATA_DIR")
+	if dataDir == "" {
+		dataDir = config.DesktopDataDir
+	}
+	dir := filepath.Join(config.ExpandHome(dataDir), "secrets")
 	os.MkdirAll(dir, 0700)
 	return dir
 }

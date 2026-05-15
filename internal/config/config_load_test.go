@@ -12,8 +12,8 @@ import (
 func TestDefault_SensibleDefaults(t *testing.T) {
 	cfg := Default()
 
-	if cfg.Gateway.Port != 18790 {
-		t.Fatalf("default port: got %d, want 18790", cfg.Gateway.Port)
+	if cfg.Gateway.Port != DefaultGatewayPort {
+		t.Fatalf("default port: got %d, want %d", cfg.Gateway.Port, DefaultGatewayPort)
 	}
 	if cfg.Gateway.RateLimitRPM != 20 {
 		t.Fatalf("default rate limit: got %d, want 20", cfg.Gateway.RateLimitRPM)
@@ -34,7 +34,7 @@ func TestLoad_MissingFile_UsesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing file should not error: %v", err)
 	}
-	if cfg.Gateway.Port != 18790 {
+	if cfg.Gateway.Port != DefaultGatewayPort {
 		t.Fatalf("expected default port, got %d", cfg.Gateway.Port)
 	}
 }
@@ -111,8 +111,20 @@ func TestLoad_EnvVarOverrides_InvalidPort(t *testing.T) {
 		t.Fatalf("load error: %v", err)
 	}
 	// Invalid port should keep default
-	if cfg.Gateway.Port != 18790 {
+	if cfg.Gateway.Port != DefaultGatewayPort {
 		t.Fatalf("invalid port env should keep default: got %d", cfg.Gateway.Port)
+	}
+}
+
+func TestDefaultSQLitePathDesktopRuntime(t *testing.T) {
+	dataDir := t.TempDir()
+	if got := DefaultSQLitePath(dataDir); got != filepath.Join(dataDir, SQLiteDBFilename) {
+		t.Fatalf("standard SQLite path: got %q", got)
+	}
+
+	t.Setenv("GOCLAW_DESKTOP", "1")
+	if got := DefaultSQLitePath(dataDir); got != filepath.Join(dataDir, DesktopSQLiteDBFilename) {
+		t.Fatalf("desktop SQLite path: got %q", got)
 	}
 }
 

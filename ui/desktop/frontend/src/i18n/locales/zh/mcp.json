@@ -10,11 +10,26 @@
   "columns": {
     "name": "名称",
     "transport": "传输协议",
+    "scope": "范围",
     "tools": "工具",
     "agents": "代理",
     "enabled": "已启用",
     "createdBy": "创建者",
     "actions": "操作"
+  },
+  "scope": {
+    "values": {
+      "global": "全局",
+      "team": "团队",
+      "project": "项目"
+    },
+    "hints": {
+      "global": "工作区内所有 Agent 均可使用。",
+      "team": "仅选定团队内的 Agent 可使用。",
+      "project": "仅有权访问选定项目的 Agent 可使用。"
+    },
+    "teamPlaceholder": "选择团队...",
+    "projectPlaceholder": "选择项目..."
   },
   "viewTools": "查看工具",
   "manageGrants": "管理授权",
@@ -55,6 +70,11 @@
     "create": "创建",
     "update": "更新",
     "saving": "保存中...",
+    "scopeTitle": "范围和授权",
+    "scopeLocked": "创建后不可修改范围。请使用管理授权调整 Agent 访问。",
+    "grantsAfterCreate": "Agent grants 在创建后管理",
+    "grantsAfterCreateHint": "先创建 server，检查 discovered tools，然后使用管理授权选择 Agent access。",
+    "noAgents": "没有可用 Agent",
     "errors": {
       "nameRequired": "名称和传输协议为必填项",
       "nameSlug": "名称必须是有效的 slug（小写字母、数字、连字符）",

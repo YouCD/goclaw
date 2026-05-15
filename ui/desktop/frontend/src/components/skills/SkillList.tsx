@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSkills, MAX_SKILLS_LITE } from '../../hooks/use-skills'
+import { useSkills } from '../../hooks/use-skills'
 import type { RuntimeStatus } from '../../hooks/use-skills'
 import { RefreshButton } from '../common/RefreshButton'
 import { ConfirmDeleteDialog } from '../common/ConfirmDeleteDialog'
@@ -9,7 +9,7 @@ import type { SkillInfo } from '../../types/skill'
 
 export function SkillList() {
   const { t } = useTranslation(['skills', 'common'])
-  const { skills, loading, atLimit, fetchSkills, toggleSkill, uploadSkill, checkRuntimes, deleteSkill } = useSkills()
+  const { skills, loading, fetchSkills, toggleSkill, uploadSkill, checkRuntimes, deleteSkill } = useSkills()
   const [runtimes, setRuntimes] = useState<RuntimeStatus | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
@@ -40,7 +40,7 @@ export function SkillList() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-text-primary">{t('title')}</h2>
-          <p className="text-xs text-text-muted mt-0.5">{t('description')} (max {MAX_SKILLS_LITE})</p>
+          <p className="text-xs text-text-muted mt-0.5">{t('description')}</p>
         </div>
         <div className="flex items-center gap-2">
           <input
@@ -52,7 +52,7 @@ export function SkillList() {
           />
           <button
             onClick={() => fileRef.current?.click()}
-            disabled={atLimit || uploading}
+            disabled={uploading}
             className="bg-accent text-white rounded-lg px-3 py-1.5 text-xs hover:bg-accent-hover disabled:opacity-50 transition-colors flex items-center gap-1.5"
           >
             {uploading ? (
@@ -74,9 +74,6 @@ export function SkillList() {
         </div>
       </div>
 
-      {atLimit && (
-        <p className="text-[11px] text-amber-600 dark:text-amber-400">{t('deps.runtimeMissing')}</p>
-      )}
       {uploadError && <p className="text-xs text-error">{uploadError}</p>}
 
       {/* Runtime status */}

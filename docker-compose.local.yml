@@ -41,18 +41,34 @@ services:
     environment:
       POSTGRES_USER: goclaw
       POSTGRES_PASSWORD: devpass
-      POSTGRES_DB: goclaw
+      POSTGRES_DB: ${POSTGRES_DB:-goclaw_v4}
     volumes:
       # PG18 places its data dir inside /var/lib/postgresql/<major-version>/.
       # Mount the parent so pg_upgrade --link works and fresh starts don't
       # collide with the "unused mount/volume" warning the image emits.
       - goclaw-local-pg:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U goclaw -d goclaw"]
+      test: ["CMD-SHELL", "pg_isready -U goclaw -d postgres"]
       interval: 5s
       timeout: 3s
       retries: 10
     restart: unless-stopped
+
+  postgres-init:
+    image: pgvector/pgvector:pg18
+    depends_on:
+      postgres-local:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres-local
+      PGUSER: goclaw
+      PGPASSWORD: devpass
+      POSTGRES_DB: ${POSTGRES_DB:-goclaw_v4}
+    command: >
+      sh -c 'case "$$POSTGRES_DB" in *[!A-Za-z0-9_]*|"") echo "invalid POSTGRES_DB"; exit 1;; esac;
+      createdb -d postgres "$$POSTGRES_DB" 2>/dev/null || true;
+      psql -d "$$POSTGRES_DB" -c "SELECT 1" >/dev/null'
+    restart: "no"
 
   goclaw-local:
     image: goclaw-local:dev
@@ -69,8 +85,8 @@ services:
     ports:
       - "18790:18790"
     depends_on:
-      postgres-local:
-        condition: service_healthy
+      postgres-init:
+        condition: service_completed_successfully
     environment:
       # ── Network ──
       GOCLAW_HOST: "0.0.0.0"
@@ -80,7 +96,7 @@ services:
 
       # ── Database ──
       # Service name = postgres-local; goclaw-net DNS resolves it inside compose.
-      GOCLAW_POSTGRES_DSN: "postgres://goclaw:devpass@postgres-local:5432/goclaw?sslmode=disable"
+      GOCLAW_POSTGRES_DSN: "postgres://goclaw:devpass@postgres-local:5432/${POSTGRES_DB:-goclaw_v4}?sslmode=disable"
 
       # ── Secrets (public dev placeholders — DO NOT REUSE IN PROD) ──
       # Gateway token: 16-byte hex, used for WS connect auth.

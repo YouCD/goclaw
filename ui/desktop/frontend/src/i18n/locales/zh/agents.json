@@ -134,6 +134,27 @@
       "title": "固定技能",
       "addPlaceholder": "添加技能...",
       "hint": "固定的技能始终内联在系统提示中。其他技能使用 skill_search。"
+    },
+    "configShell": {
+      "identityModel": "身份与模型",
+      "identityModelDesc": "名称、状态、provider、model 和预算限制。",
+      "reasoningPrompt": "推理与提示词",
+      "reasoningPromptDesc": "系统提示词模式和 extended thinking 覆盖。",
+      "memoryContext": "记忆与上下文",
+      "memoryContextDesc": "长期记忆、上下文修剪和压缩。",
+      "toolsSandbox": "工具与沙盒",
+      "toolsSandboxDesc": "Subagent 限制、工具策略和执行隔离。",
+      "skillsMcp": "技能与 MCP",
+      "skillsMcpDesc": "固定技能、授权技能和 MCP 服务器访问。",
+      "voice": "语音 / TTS",
+      "voiceDesc": "该 Agent 专属的语音和微调参数覆盖。",
+      "evolution": "进化",
+      "evolutionDesc": "自我进化设置、指标、建议和护栏。",
+      "files": "文件",
+      "filesDesc": "Agent 上下文文件和重新生成工具。",
+      "unsaved": "未保存",
+      "unsavedHint": "此 Agent 配置中有未保存的更改。",
+      "noChanges": "没有待保存更改。"
     }
   },
   "general": {

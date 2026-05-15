@@ -52,14 +52,13 @@ export function AboutTab() {
       </div>
 
       <div>
-        <h3 className="text-sm font-semibold text-text-primary mb-2">{t('about.editionLimits')}</h3>
+        <h3 className="text-sm font-semibold text-text-primary mb-2">{t('about.technicalProfile')}</h3>
         <div className="rounded-lg border border-border divide-y divide-border text-xs">
           {[
-            { label: t('about.agents'), limit: t('about.maxAgents') },
-            { label: t('about.teams'), limit: t('about.maxTeams') },
-            { label: t('about.teamMembers'), limit: t('about.maxTeamMembers') },
             { label: t('about.database'), limit: t('about.databaseValue') },
             { label: t('about.users'), limit: t('about.usersValue') },
+            { label: t('about.vectorSearch'), limit: t('about.vectorSearchValue') },
+            { label: t('about.kg'), limit: t('about.kgValue') },
           ].map((item) => (
             <div key={item.label} className="flex justify-between px-3 py-2">
               <span className="text-text-muted">{item.label}</span>

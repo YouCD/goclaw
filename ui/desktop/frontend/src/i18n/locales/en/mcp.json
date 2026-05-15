@@ -10,11 +10,26 @@
   "columns": {
     "name": "Name",
     "transport": "Transport",
+    "scope": "Scope",
     "tools": "Tools",
     "agents": "Agents",
     "enabled": "Enabled",
     "createdBy": "Created By",
     "actions": "Actions"
+  },
+  "scope": {
+    "values": {
+      "global": "Global",
+      "team": "Team",
+      "project": "Project"
+    },
+    "hints": {
+      "global": "Available to every agent in the workspace.",
+      "team": "Restricted to agents within the selected team.",
+      "project": "Restricted to agents granted access to the selected project."
+    },
+    "teamPlaceholder": "Select a team...",
+    "projectPlaceholder": "Select a project..."
   },
   "viewTools": "View tools",
   "manageGrants": "Manage grants",
@@ -55,6 +70,11 @@
     "create": "Create",
     "update": "Update",
     "saving": "Saving...",
+    "scopeTitle": "Scope and grants",
+    "scopeLocked": "Scope is fixed after creation. Use Manage grants to change agent access.",
+    "grantsAfterCreate": "Agent grants are managed after create",
+    "grantsAfterCreateHint": "Create the server first, inspect discovered tools, then use Manage grants to choose agent access.",
+    "noAgents": "No agents available",
     "errors": {
       "nameRequired": "Name and transport are required",
       "nameSlug": "Name must be a valid slug (lowercase letters, numbers, hyphens only)",

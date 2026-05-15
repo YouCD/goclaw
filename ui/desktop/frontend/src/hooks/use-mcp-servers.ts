@@ -3,8 +3,6 @@ import { mcpService } from '../services/mcp-service'
 import { toast } from '../stores/toast-store'
 import type { MCPServerData, MCPServerInput, MCPAgentGrant, MCPToolInfo } from '../types/mcp'
 
-export const MAX_MCP_LITE = 5
-
 export function useMcpServers() {
   const [servers, setServers] = useState<MCPServerData[]>([])
   const [loading, setLoading] = useState(true)
@@ -98,10 +96,8 @@ export function useMcpServers() {
     await fetchServers()
   }, [fetchServers])
 
-  const atLimit = servers.length >= MAX_MCP_LITE
-
   return {
-    servers, loading, atLimit,
+    servers, loading,
     fetchServers, createServer, updateServer, deleteServer,
     testConnection, reconnectServer, listServerTools,
     listGrants, grantAgent, revokeAgent,

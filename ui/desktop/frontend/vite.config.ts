@@ -18,15 +18,15 @@ export default defineConfig({
     proxy: {
       // Proxy API + WS calls to gateway in dev mode (avoids CORS)
       '/v1': {
-        target: 'http://localhost:18790',
+        target: 'http://localhost:18791',
         changeOrigin: true,
       },
       '/ws': {
-        target: 'ws://localhost:18790',
+        target: 'ws://localhost:18791',
         ws: true,
       },
       '/health': {
-        target: 'http://localhost:18790',
+        target: 'http://localhost:18791',
         changeOrigin: true,
       },
     },
