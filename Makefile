@@ -12,7 +12,7 @@ build:
 build-full: check-web
 	rm -rf internal/webui/dist && mkdir -p internal/webui/dist
 	cp -r ui/web/dist/* internal/webui/dist/
-	CGO_ENABLED=0 go build -tags embedui -ldflags="$(LDFLAGS)" -o $(BINARY) .
+	CGO_ENABLED=0 go build -tags "embedui,otel" -ldflags="$(LDFLAGS)" -o $(BINARY) .
 
 # Build with TUI (Bubble Tea enhanced CLI)
 build-tui:
