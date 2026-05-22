@@ -158,6 +158,13 @@ export function SigmaGraphContainer({
     };
 
     // Create Sigma — shows nodes at random positions immediately
+    // Guard: WebGL may be unavailable (remote desktop, headless, context lost)
+    const gl = containerRef.current.querySelector("canvas")?.getContext("webgl2")
+      ?? containerRef.current.querySelector("canvas")?.getContext("webgl");
+    if (!gl) {
+      console.warn("SigmaGraphContainer: k not available — graph rendering skipped");
+      return;
+    }
     const sigma = new Sigma(graph, containerRef.current, {
       allowInvalidContainer: true,
       renderLabels: true,
