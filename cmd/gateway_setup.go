@@ -14,11 +14,11 @@ import (
 	"github.com/nextlevelbuilder/goclaw/internal/bootstrap"
 	"github.com/nextlevelbuilder/goclaw/internal/bus"
 	"github.com/nextlevelbuilder/goclaw/internal/config"
+	"github.com/nextlevelbuilder/goclaw/internal/edition"
 	mcpbridge "github.com/nextlevelbuilder/goclaw/internal/mcp"
 	"github.com/nextlevelbuilder/goclaw/internal/permissions"
 	"github.com/nextlevelbuilder/goclaw/internal/providers"
 	"github.com/nextlevelbuilder/goclaw/internal/sandbox"
-	"github.com/nextlevelbuilder/goclaw/internal/edition"
 	"github.com/nextlevelbuilder/goclaw/internal/skills"
 	"github.com/nextlevelbuilder/goclaw/internal/store"
 	"github.com/nextlevelbuilder/goclaw/internal/store/pg"
@@ -214,6 +214,7 @@ func setupToolRegistry(
 			// Apply global shell deny-group toggles before any request can arrive.
 			// Per-agent overrides via store.WithShellDenyGroups still win per-key.
 			et.SetGlobalShellDenyGroups(cfg.Tools.ShellDenyGroups)
+			et.SetCommandKeywordAllowlist(cfg.Tools.CommandKeywordAllowlist)
 			et.DenyPaths(dataDir, ".goclaw/")
 			// Allow skills execution: master-tenant skills-store + all tenant-scoped skills-store dirs.
 			et.AllowPathExemptions(
@@ -221,6 +222,14 @@ func setupToolRegistry(
 				filepath.Join(dataDir, "skills-store")+"/",
 				filepath.Join(dataDir, "tenants")+"/",
 			)
+			// Allow the goclaw-managed Python venv interpreter to be invoked with its
+			// absolute path. venv/bin/python3 is a symlink to the real interpreter
+			// (e.g. linuxbrew cellar), and matchesAnyPathExemption resolves symlinks
+			// before comparing — so we must exempt the *resolved* target dir.
+			// Resolved at startup; falls back silently if venv not present.
+			if real, err := filepath.EvalSymlinks(filepath.Join(filepath.Dir(dataDir), "venv", "bin", "python3")); err == nil {
+				et.AllowPathExemptions(filepath.Dir(real) + "/")
+			}
 			// Harden: block access to internal workspace files via shell commands.
 			// Prevents `cat ../config.json`, `cat memory.db` etc. from user workspaces.
 			et.DenyPaths(
@@ -321,7 +330,7 @@ func wireTracingAndCron(
 	// Start snapshot worker for hourly usage aggregation
 	var snapshotWorker *tracing.SnapshotWorker
 	if stores.Snapshots != nil {
-		snapshotWorker = tracing.NewSnapshotWorker(stores.DB, stores.Snapshots)
+		snapshotWorker = tracing.NewSnapshotWorker(stores.DB, stores.Snapshots, stores.UsageEvents)
 		snapshotWorker.Start()
 
 		// Backfill historical data in background
@@ -603,4 +612,3 @@ func setupSkillsSystem(
 
 	return skillsLoader, skillSearchTool, globalSkillsDir, bundledSkillsDir, builtinSkillsDir
 }
-
