@@ -13,6 +13,7 @@ const (
 	ProviderOpenAICompat    = "openai_compat"
 	ProviderGeminiNative    = "gemini_native"
 	ProviderOpenRouter      = "openrouter"
+	ProviderAIMLAPI         = "aimlapi"
 	ProviderGroq            = "groq"
 	ProviderDeepSeek        = "deepseek"
 	ProviderMistral         = "mistral"
@@ -27,14 +28,24 @@ const (
 	ProviderYesScale        = "yescale"
 	ProviderZai             = "zai"
 	ProviderZaiCoding       = "zai_coding"
-	ProviderOllama          = "ollama"       // local or self-hosted Ollama (no API key)
-	ProviderOllamaCloud     = "ollama_cloud" // Ollama Cloud (Bearer token required)
-	ProviderACP             = "acp"          // ACP (Agent Client Protocol) agent subprocess
+	ProviderOllama          = "ollama"          // local or self-hosted Ollama (no API key)
+	ProviderOllamaCloud     = "ollama_cloud"    // Ollama Cloud (Bearer token required)
+	ProviderACP             = "acp"             // ACP (Agent Client Protocol) agent subprocess
 	ProviderNovita          = "novita"          // Novita AI (OpenAI-compatible endpoint)
 	ProviderBytePlus        = "byteplus"        // BytePlus ModelArk (Seed 2.0 models)
 	ProviderBytePlusCoding  = "byteplus_coding" // BytePlus ModelArk Coding Plan
 	ProviderVertex          = "vertex"          // Google Cloud Vertex AI (OAuth2 service account + ADC)
 	ProviderKimiCoding      = "kimi_coding"     // Moonshot Kimi Coding (OpenAI-compat, requires fixed User-Agent)
+	ProviderAtlasCloud      = "atlascloud"      // Atlas Cloud (OpenAI-compatible endpoint)
+
+	// MiniMax defaults.
+	MiniMaxDefaultAPIBase = "https://api.minimax.io/v1"
+	MiniMaxDefaultModel   = "MiniMax-M3"
+
+	// Z.AI defaults.
+	ZaiDefaultAPIBase       = "https://api.z.ai/api/paas/v4"
+	ZaiCodingDefaultAPIBase = "https://api.z.ai/api/coding/paas/v4"
+	ZaiDefaultModel         = "glm-5.2"
 
 	// Novita AI defaults.
 	NovitaDefaultAPIBase = "https://api.novita.ai/openai"
@@ -48,9 +59,13 @@ const (
 	// Kimi Coding defaults. The upstream requires a fixed User-Agent on every
 	// request — handled by the runtime in cmd/gateway_providers.go via
 	// OpenAIProvider.WithExtraHeaders.
-	KimiCodingDefaultAPIBase   = "https://api.kimi.com/coding/v1"
-	KimiCodingDefaultModel     = "kimi-k2-turbo-preview"
+	KimiCodingDefaultAPIBase    = "https://api.kimi.com/coding/v1"
+	KimiCodingDefaultModel      = "kimi-k2-turbo-preview"
 	KimiCodingRequiredUserAgent = "claude-code/0.1.0"
+
+	// Atlas Cloud defaults.
+	AtlasCloudDefaultAPIBase = "https://api.atlascloud.ai/v1"
+	AtlasCloudDefaultModel   = "qwen/qwen3.5-flash"
 )
 
 // Vertex AI constants live in internal/providers/vertex.go to avoid a store→providers import cycle
@@ -63,6 +78,7 @@ var ValidProviderTypes = map[string]bool{
 	ProviderOpenAICompat:    true,
 	ProviderGeminiNative:    true,
 	ProviderOpenRouter:      true,
+	ProviderAIMLAPI:         true,
 	ProviderGroq:            true,
 	ProviderDeepSeek:        true,
 	ProviderMistral:         true,
@@ -85,6 +101,7 @@ var ValidProviderTypes = map[string]bool{
 	ProviderBytePlusCoding:  true,
 	ProviderVertex:          true,
 	ProviderKimiCoding:      true,
+	ProviderAtlasCloud:      true,
 }
 
 // VertexProviderSettings holds Vertex-specific config stored in llm_providers.settings JSONB.
@@ -142,6 +159,27 @@ type ProviderReasoningConfig struct {
 	Fallback string `json:"fallback,omitempty" db:"-"`
 }
 
+// OllamaSettings holds Ollama-specific configuration stored in the provider settings JSONB.
+type OllamaSettings struct {
+	// NumCtx overrides the context window size sent in options.num_ctx on every request.
+	// When nil, the gateway queries the Ollama API (/api/show) for the model's native
+	// context length, falling back to 131072 if the API is unreachable.
+	NumCtx *int `json:"num_ctx,omitempty" db:"-"`
+}
+
+// ParseOllamaSettings extracts Ollama-specific config from a provider's settings JSONB.
+// Returns nil when no relevant settings are present.
+func ParseOllamaSettings(settings json.RawMessage) *OllamaSettings {
+	if len(settings) == 0 {
+		return nil
+	}
+	var s OllamaSettings
+	if json.Unmarshal(settings, &s) != nil || s.NumCtx == nil {
+		return nil
+	}
+	return &s
+}
+
 // ChatGPTOAuthProviderSettings holds provider-level defaults for Codex account pooling.
 type ChatGPTOAuthProviderSettings struct {
 	CodexPool *ChatGPTOAuthRoutingConfig `json:"codex_pool,omitempty" db:"-"`
@@ -160,6 +198,24 @@ func ParseEmbeddingSettings(settings json.RawMessage) *EmbeddingSettings {
 		return nil
 	}
 	return s.Embedding
+}
+
+// ParseThinkingEnabled extracts the provider-level override for whether the
+// provider should be asked to emit visible reasoning/thinking tokens (e.g.
+// Ollama native "think" field, OpenAI-compat "think" for Ollama endpoints).
+// Returns nil when unset in settings JSONB, meaning "use provider default"
+// (currently off for Ollama). Explicit true/false overrides that default.
+func ParseThinkingEnabled(settings json.RawMessage) *bool {
+	if len(settings) == 0 {
+		return nil
+	}
+	var s struct {
+		ThinkingEnabled *bool `json:"thinking_enabled"`
+	}
+	if json.Unmarshal(settings, &s) != nil {
+		return nil
+	}
+	return s.ThinkingEnabled
 }
 
 // ParseChatGPTOAuthProviderSettings extracts provider-level Codex pool defaults from settings JSONB.
